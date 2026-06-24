@@ -1,0 +1,18 @@
+# MoveIt executes planned arm trajectories through a FollowJointTrajectory
+# action. On smabo that action is served by smabo_brain_ros/servo_trajectory_bridge,
+# which republishes each trajectory as /servo/command for the ESP32 (rosbridge).
+moveit_simple_controller_manager:
+  controller_names:
+    - smabo_arm_controller
+
+  smabo_arm_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints:
+      - arm_joint_1
+      - arm_joint_2
+      - arm_joint_3
+      - arm_joint_4
+
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager

@@ -25,6 +25,7 @@ setup(
     entry_points={
         "console_scripts": [
             "odom_node = smabo_brain_ros.odom_node:main",
+            "servo_trajectory_bridge = smabo_brain_ros.servo_trajectory_bridge:main",
         ],
     },
 )

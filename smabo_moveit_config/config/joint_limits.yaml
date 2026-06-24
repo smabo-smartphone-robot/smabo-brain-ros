@@ -1,0 +1,11 @@
+# Velocity/acceleration limits used by MoveIt time-parameterisation.
+# Position limits come from the URDF (±90 deg, matching the SG90 servos).
+default_velocity_scaling_factor: 0.5
+default_acceleration_scaling_factor: 0.5
+
+joint_limits:
+  arm_joint_1: { has_velocity_limits: true, max_velocity: 2.0, has_acceleration_limits: true, max_acceleration: 4.0 }
+  arm_joint_2: { has_velocity_limits: true, max_velocity: 2.0, has_acceleration_limits: true, max_acceleration: 4.0 }
+  arm_joint_3: { has_velocity_limits: true, max_velocity: 2.0, has_acceleration_limits: true, max_acceleration: 4.0 }
+  arm_joint_4: { has_velocity_limits: true, max_velocity: 2.0, has_acceleration_limits: true, max_acceleration: 4.0 }
+  head_pan:    { has_velocity_limits: true, max_velocity: 2.0, has_acceleration_limits: true, max_acceleration: 4.0 }

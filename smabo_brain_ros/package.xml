@@ -10,7 +10,11 @@
   <exec_depend>rclpy</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>control_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>topic_tools</exec_depend>
   <exec_depend>smabo_interfaces</exec_depend>
 
   <!-- Python logic dependency 'brain' (smabo-brain) is not a ROS package;

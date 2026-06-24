@@ -1,0 +1,201 @@
+<?xml version="1.0"?>
+<!--
+  smabo robot model (scaffold).
+
+  Geometry is primitive (boxes/cylinders) — accurate enough for Nav2 footprint,
+  TF, MoveIt planning and the web 3D viewer, but NOT mesh-accurate. Dimensions
+  and joint limits mirror smabo-esp32 config.py DEFAULTS:
+
+    dc.wheel_radius      = 0.030 m      dc.wheel_separation = 0.150 m
+    servos.joints        = left_hand, right_hand, head_pan, arm_joint_1..4
+    servo min/max angle  = ±90 deg  (hands 0..90)  → joint limits below
+
+  Frames: odom -> base_link is published by smabo_brain_ros/odom_node; this file
+  provides base_link -> {wheels, laser (LD06), arm, head, hands}. The lidar frame
+  is named `laser` to match the /scan header arriving over rosbridge.
+-->
+<robot name="smabo" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ===== parameters (kept in sync with smabo-esp32 config) ===== -->
+  <xacro:property name="wheel_radius"     value="0.030"/>
+  <xacro:property name="wheel_separation" value="0.150"/>
+  <xacro:property name="wheel_width"      value="0.020"/>
+  <xacro:property name="base_len"         value="0.180"/>
+  <xacro:property name="base_wid"         value="0.150"/>
+  <xacro:property name="base_hgt"         value="0.050"/>
+  <xacro:property name="deg90"            value="1.5708"/>
+  <xacro:property name="arm_link_len"     value="0.050"/>
+
+  <material name="smabo_body"><color rgba="0.20 0.45 0.80 1.0"/></material>
+  <material name="smabo_dark"><color rgba="0.15 0.15 0.18 1.0"/></material>
+  <material name="smabo_accent"><color rgba="0.90 0.55 0.10 1.0"/></material>
+
+  <!-- inertial helper (small, isotropic; planning/viz only) -->
+  <xacro:macro name="dummy_inertial" params="mass:=0.05">
+    <inertial>
+      <mass value="${mass}"/>
+      <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ===== base =====
+       base_link is the URDF root and the frame odom_node publishes
+       (odom -> base_link), so we deliberately do NOT add a base_footprint
+       parent — that would give base_link two TF parents (odom and footprint).
+       Nav2 uses robot_base_frame: base_link to match. -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="${base_len} ${base_wid} ${base_hgt}"/></geometry>
+      <material name="smabo_body"/>
+    </visual>
+    <collision>
+      <geometry><box size="${base_len} ${base_wid} ${base_hgt}"/></geometry>
+    </collision>
+    <xacro:dummy_inertial mass="0.8"/>
+  </link>
+
+  <!-- ===== drive wheels (continuous, about y) ===== -->
+  <xacro:macro name="wheel" params="name y">
+    <link name="${name}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="${deg90} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+        <material name="smabo_dark"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${deg90} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+      </collision>
+      <xacro:dummy_inertial mass="0.05"/>
+    </link>
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child  link="${name}_wheel_link"/>
+      <origin xyz="0 ${y} ${-base_hgt/2}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel name="left"  y="${ wheel_separation/2}"/>
+  <xacro:wheel name="right" y="${-wheel_separation/2}"/>
+
+  <!-- ===== caster (fixed) ===== -->
+  <link name="caster_link">
+    <visual>
+      <geometry><sphere radius="0.012"/></geometry>
+      <material name="smabo_dark"/>
+    </visual>
+    <collision><geometry><sphere radius="0.012"/></geometry></collision>
+    <xacro:dummy_inertial mass="0.02"/>
+  </link>
+  <joint name="caster_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="caster_link"/>
+    <origin xyz="${base_len/2 - 0.02} 0 ${-base_hgt/2 - (wheel_radius - 0.012)}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ===== LD06 lidar (frame name `laser` to match /scan header) ===== -->
+  <link name="laser">
+    <visual>
+      <geometry><cylinder radius="0.018" length="0.030"/></geometry>
+      <material name="smabo_dark"/>
+    </visual>
+    <collision><geometry><cylinder radius="0.018" length="0.030"/></geometry></collision>
+    <xacro:dummy_inertial mass="0.05"/>
+  </link>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="laser"/>
+    <origin xyz="0 0 ${base_hgt/2 + 0.015}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ===== head (head_pan, revolute about z) ===== -->
+  <link name="head_link">
+    <visual>
+      <geometry><box size="0.05 0.07 0.05"/></geometry>
+      <material name="smabo_accent"/>
+    </visual>
+    <xacro:dummy_inertial mass="0.05"/>
+  </link>
+  <joint name="head_pan" type="revolute">
+    <parent link="base_link"/>
+    <child  link="head_link"/>
+    <origin xyz="${base_len/2 - 0.04} 0 ${base_hgt/2 + 0.05}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${-deg90}" upper="${deg90}" effort="1.0" velocity="2.0"/>
+  </joint>
+
+  <!-- ===== hands (left_hand / right_hand, revolute about y, 0..90) ===== -->
+  <xacro:macro name="hand" params="name y">
+    <link name="${name}_link">
+      <visual>
+        <geometry><box size="0.06 0.015 0.015"/></geometry>
+        <material name="smabo_dark"/>
+      </visual>
+      <xacro:dummy_inertial mass="0.02"/>
+    </link>
+    <joint name="${name}" type="revolute">
+      <parent link="base_link"/>
+      <child  link="${name}_link"/>
+      <origin xyz="0 ${y} ${base_hgt/2}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="0" upper="${deg90}" effort="1.0" velocity="2.0"/>
+    </joint>
+  </xacro:macro>
+  <xacro:hand name="left_hand"  y="${ base_wid/2 + 0.01}"/>
+  <xacro:hand name="right_hand" y="${-base_wid/2 - 0.01}"/>
+
+  <!-- ===== arm (arm_joint_1..4) ===== -->
+  <!-- mounting base of the arm on top of the chassis -->
+  <link name="arm_base_link">
+    <visual>
+      <geometry><cylinder radius="0.02" length="0.02"/></geometry>
+      <material name="smabo_accent"/>
+    </visual>
+    <xacro:dummy_inertial mass="0.05"/>
+  </link>
+  <joint name="arm_mount_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="arm_base_link"/>
+    <origin xyz="${-base_len/2 + 0.04} 0 ${base_hgt/2 + 0.01}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- one revolute joint + link segment of the serial arm -->
+  <xacro:macro name="arm_segment" params="index parent axis">
+    <link name="arm_link_${index}">
+      <visual>
+        <origin xyz="0 0 ${arm_link_len/2}" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.012" length="${arm_link_len}"/></geometry>
+        <material name="smabo_body"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 ${arm_link_len/2}" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.012" length="${arm_link_len}"/></geometry>
+      </collision>
+      <xacro:dummy_inertial mass="0.03"/>
+    </link>
+    <joint name="arm_joint_${index}" type="revolute">
+      <parent link="${parent}"/>
+      <child  link="arm_link_${index}"/>
+      <origin xyz="0 0 ${arm_link_len}" rpy="0 0 0"/>
+      <axis xyz="${axis}"/>
+      <limit lower="${-deg90}" upper="${deg90}" effort="1.0" velocity="2.0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- joint_1 yaw about z, joints 2-4 pitch about y -->
+  <xacro:arm_segment index="1" parent="arm_base_link" axis="0 0 1"/>
+  <xacro:arm_segment index="2" parent="arm_link_1"    axis="0 1 0"/>
+  <xacro:arm_segment index="3" parent="arm_link_2"    axis="0 1 0"/>
+  <xacro:arm_segment index="4" parent="arm_link_3"    axis="0 1 0"/>
+
+  <!-- tool frame (arm tip) for MoveIt IK -->
+  <link name="arm_tool0"/>
+  <joint name="arm_tool0_joint" type="fixed">
+    <parent link="arm_link_4"/>
+    <child  link="arm_tool0"/>
+    <origin xyz="0 0 ${arm_link_len}" rpy="0 0 0"/>
+  </joint>
+
+</robot>

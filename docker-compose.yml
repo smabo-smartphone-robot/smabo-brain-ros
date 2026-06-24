@@ -1,0 +1,26 @@
+# Bring up the full smabo ROS 2 graph (rosbridge + Nav2 + MoveIt2 + odom).
+#
+#   docker compose build
+#   docker compose up
+#
+# rosbridge is exposed on :9090 (host networking) — point smabo-web / the ESP32
+# at ws://<this-host>:9090. The two sibling repos are mounted for live editing;
+# the entrypoint rebuilds the workspace if needed.
+services:
+  smabo-ros:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: smabo-brain-ros:humble
+    network_mode: host          # rosbridge :9090 + DDS discovery on the LAN
+    environment:
+      - ROS_DOMAIN_ID=0
+      - SMABO_WS=/opt/smabo_ws
+      - SMABO_BRAIN_DIR=/opt/smabo-brain
+    volumes:
+      - ./:/opt/smabo_ws/src/smabo-brain-ros:rw
+      - ../smabo-brain:/opt/smabo-brain:rw
+    # default CMD launches bringup; override for sim/slam, e.g.:
+    #   docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py sim:=true
+    stdin_open: true
+    tty: true

@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>smabo_bringup</name>
+  <version>0.1.0</version>
+  <description>Top-level launch for smabo-brain-ros: rosbridge + prefix relays +
+    odometry + robot_state_publisher + Nav2 + MoveIt2, with a sim variant.</description>
+  <maintainer email="daigaku.robot@gmail.com">smabo</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>rosbridge_server</exec_depend>
+  <exec_depend>rosapi</exec_depend>
+  <exec_depend>smabo_brain_ros</exec_depend>
+  <exec_depend>smabo_description</exec_depend>
+  <exec_depend>smabo_navigation</exec_depend>
+  <exec_depend>smabo_moveit_config</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
