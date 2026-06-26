@@ -28,6 +28,15 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ros-humble-tf2-web-republisher \
     ; rm -rf /var/lib/apt/lists/* || true
 
+# aiortc: webrtc_camera_node terminates smabo-app's WebRTC video as a peer and
+# republishes frames as native sensor_msgs/Image (camera bypasses rosbridge for
+# real-time — see README / design.md). Pulls PyAV (ffmpeg) + pylibsrtp. The apt
+# libs help the build on architectures without prebuilt wheels (e.g. ARM/RPi).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libsrtp2-dev libopus-dev libvpx-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --no-cache-dir aiortc
+
 # --- workspace layout ---
 # Build context is this repo (see docker-compose.yml: context: .). smabo-brain is
 # only needed at *runtime* (odom_node / relays import `brain`), so it is mounted

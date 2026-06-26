@@ -13,6 +13,9 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>trajectory_msgs</exec_depend>
   <exec_depend>control_msgs</exec_depend>
+  <exec_depend>vision_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>topic_tools</exec_depend>
   <exec_depend>smabo_interfaces</exec_depend>

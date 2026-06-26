@@ -21,12 +21,17 @@ except Exception:  # brain not importable (e.g. lint w/o PYTHONPATH) — fallbac
     SOURCE_PREFIXES = {"web": "/web", "app": "/app", "esp32": "/esp32"}
 
 # canonical topics each client publishes (prefix is prepended by the client).
+# Camera video is NOT here: smabo-app sends it over WebRTC (P2P) to
+# webrtc_camera_node, not as a prefixed rosbridge topic — only the small
+# /webrtc/* signaling rides rosbridge and is relayed below.
 _PREFIXED_PUBLISH = {
     "web":   ["/cmd_vel", "/servo/command", "/initialpose", "/goal_pose",
-              "/speech/say", "/expression", "/look_at", "/ping"],
+              "/speech/say", "/expression", "/look_at", "/ping",
+              "/vision/config",
+              "/webrtc/preview", "/webrtc/web_answer", "/webrtc/web_ice"],
     "esp32": ["/wheel_vel", "/joint_states", "/scan", "/pong"],
-    "app":   ["/imu/data", "/gps/fix", "/camera/image/compressed",
-              "/speech/recognized"],
+    "app":   ["/imu/data", "/gps/fix", "/speech/recognized",
+              "/webrtc/offer", "/webrtc/app_ice"],
 }
 
 

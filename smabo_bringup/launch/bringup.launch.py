@@ -7,6 +7,7 @@ Composes, in one place:
   - rosbridge_suite                                   → WS<->ROS2 for web/app/esp32
   - Nav2 (+ AMCL or SLAM)                             → /odom,/scan -> /cmd_vel
   - MoveIt2 move_group + servo_trajectory_bridge      → arm planning -> /servo/command
+  - vision (webrtc_camera + image_processor + policies)→ WebRTC video -> detections -> behaviours
 
 Arguments:
   sim          (false) simulate the arm: servo_trajectory_bridge publishes
@@ -14,6 +15,8 @@ Arguments:
   slam         (false) build a map with slam_toolbox instead of AMCL+map.
   use_nav      (true)  start Nav2.
   use_moveit   (true)  start MoveIt2 + the servo trajectory bridge.
+  use_vision   (true)  start the vision pipeline (webrtc_camera ingests the
+               smabo-app WebRTC video as /camera/image_raw, then detection).
   use_rosbridge(true)  start rosbridge_suite.
   rosbridge_port (9090).
 """
@@ -35,6 +38,7 @@ def generate_launch_description():
     slam = LaunchConfiguration("slam")
     use_nav = LaunchConfiguration("use_nav")
     use_moveit = LaunchConfiguration("use_moveit")
+    use_vision = LaunchConfiguration("use_vision")
     use_rosbridge = LaunchConfiguration("use_rosbridge")
     rosbridge_port = LaunchConfiguration("rosbridge_port")
 
@@ -49,6 +53,7 @@ def generate_launch_description():
         DeclareLaunchArgument("slam", default_value="false"),
         DeclareLaunchArgument("use_nav", default_value="true"),
         DeclareLaunchArgument("use_moveit", default_value="true"),
+        DeclareLaunchArgument("use_vision", default_value="true"),
         DeclareLaunchArgument("use_rosbridge", default_value="true"),
         DeclareLaunchArgument("rosbridge_port", default_value="9090"),
 
@@ -118,5 +123,13 @@ def generate_launch_description():
             output="screen",
             parameters=[{"simulate": ParameterValue(sim, value_type=bool)}],
             condition=IfCondition(use_moveit),
+        ),
+
+        # --- vision: webrtc_camera (WebRTC video -> /camera/image_raw) + detection + policies ---
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(brain_ros, "launch", "vision.launch.py")
+            ),
+            condition=IfCondition(use_vision),
         ),
     ])

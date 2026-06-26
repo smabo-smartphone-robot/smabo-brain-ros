@@ -26,6 +26,11 @@ setup(
         "console_scripts": [
             "odom_node = smabo_brain_ros.odom_node:main",
             "servo_trajectory_bridge = smabo_brain_ros.servo_trajectory_bridge:main",
+            "webrtc_camera_node = smabo_brain_ros.webrtc_camera_node:main",
+            "image_processor_node = smabo_brain_ros.image_processor_node:main",
+            "gaze_policy_node = smabo_brain_ros.gaze_policy_node:main",
+            "neck_policy_node = smabo_brain_ros.neck_policy_node:main",
+            "drive_policy_node = smabo_brain_ros.drive_policy_node:main",
         ],
     },
 )
