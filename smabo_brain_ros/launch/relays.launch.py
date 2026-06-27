@@ -30,7 +30,7 @@ _PREFIXED_PUBLISH = {
               "/vision/config",
               "/webrtc/preview", "/webrtc/web_answer", "/webrtc/web_ice"],
     "esp32": ["/wheel_vel", "/joint_states", "/scan", "/pong"],
-    "app":   ["/imu/data", "/gps/fix", "/speech/recognized",
+    "app":   ["/imu/data", "/gps/fix", "/speech/audio",
               "/webrtc/offer", "/webrtc/app_ice"],
 }
 

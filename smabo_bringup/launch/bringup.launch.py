@@ -8,6 +8,7 @@ Composes, in one place:
   - Nav2 (+ AMCL or SLAM)                             → /odom,/scan -> /cmd_vel
   - MoveIt2 move_group + servo_trajectory_bridge      → arm planning -> /servo/command
   - vision (webrtc_camera + image_processor + policies)→ WebRTC video -> detections -> behaviours
+  - speech_recognizer                                 → /speech/audio (STT) -> /speech/recognized
 
 Arguments:
   sim          (false) simulate the arm: servo_trajectory_bridge publishes
@@ -17,6 +18,8 @@ Arguments:
   use_moveit   (true)  start MoveIt2 + the servo trajectory bridge.
   use_vision   (true)  start the vision pipeline (webrtc_camera ingests the
                smabo-app WebRTC video as /camera/image_raw, then detection).
+  use_speech   (true)  start speech_recognizer (/speech/audio -> STT ->
+               /speech/recognized).
   use_rosbridge(true)  start rosbridge_suite.
   rosbridge_port (9090).
 """
@@ -39,6 +42,7 @@ def generate_launch_description():
     use_nav = LaunchConfiguration("use_nav")
     use_moveit = LaunchConfiguration("use_moveit")
     use_vision = LaunchConfiguration("use_vision")
+    use_speech = LaunchConfiguration("use_speech")
     use_rosbridge = LaunchConfiguration("use_rosbridge")
     rosbridge_port = LaunchConfiguration("rosbridge_port")
 
@@ -54,6 +58,7 @@ def generate_launch_description():
         DeclareLaunchArgument("use_nav", default_value="true"),
         DeclareLaunchArgument("use_moveit", default_value="true"),
         DeclareLaunchArgument("use_vision", default_value="true"),
+        DeclareLaunchArgument("use_speech", default_value="true"),
         DeclareLaunchArgument("use_rosbridge", default_value="true"),
         DeclareLaunchArgument("rosbridge_port", default_value="9090"),
 
@@ -131,5 +136,13 @@ def generate_launch_description():
                 os.path.join(brain_ros, "launch", "vision.launch.py")
             ),
             condition=IfCondition(use_vision),
+        ),
+
+        # --- speech: /speech/audio (STT) -> /speech/recognized ---
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(brain_ros, "launch", "speech.launch.py")
+            ),
+            condition=IfCondition(use_speech),
         ),
     ])

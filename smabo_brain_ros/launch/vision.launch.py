@@ -40,7 +40,7 @@ def generate_launch_description():
         DeclareLaunchArgument("image_width", default_value="640"),
         DeclareLaunchArgument("image_height", default_value="480"),
         DeclareLaunchArgument("hfov_deg", default_value="60.0"),
-        DeclareLaunchArgument("capture_fps", default_value="5.0",
+        DeclareLaunchArgument("capture_fps", default_value="30.0",
                               description="WebRTC frame rate fed into vision (1-30)"),
 
         Node(

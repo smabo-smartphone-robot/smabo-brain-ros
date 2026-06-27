@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-joint-state-publisher-gui \
       ros-humble-xacro \
       ros-humble-topic-tools \
+      ros-humble-audio-common-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # tf2_web_republisher feeds TF to the ros3djs viewer in smabo-web. It may not be
@@ -36,6 +37,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libsrtp2-dev libopus-dev libvpx-dev pkg-config \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir aiortc
+
+# vosk: default speech-to-text engine for speech_recognizer_node (brain.stt).
+# Offline; faster-whisper is the optional, heavier alternative (install only
+# when stt_engine:=whisper). Imported lazily, so the node runs without them.
+RUN python3 -m pip install --no-cache-dir vosk
 
 # --- workspace layout ---
 # Build context is this repo (see docker-compose.yml: context: .). smabo-brain is

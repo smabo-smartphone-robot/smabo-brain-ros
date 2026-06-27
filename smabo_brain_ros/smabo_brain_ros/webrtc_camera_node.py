@@ -50,7 +50,7 @@ class WebRtcCameraNode(Node):
         self.declare_parameter("frame_id", "camera")
         self.declare_parameter("image_topic", "camera/image_raw")
         self.declare_parameter("config_topic", "vision/config")
-        self.declare_parameter("capture_fps", 5.0)
+        self.declare_parameter("capture_fps", 30.0)
 
         self._frame_id = self.get_parameter("frame_id").value
 
