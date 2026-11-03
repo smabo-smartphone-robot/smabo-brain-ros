@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<!--
+  smabo arm: 3-DOF SG90 arm + gripper mounted on the smabo base (smabo_base.xacro).
+  Meshes split from smabo-hardware/step/assembly/smabo_arm.step by
+  scripts/split_smabo_meshes.py (the smabo_base parts of that STEP are skipped).
+
+  Links (STEP parts):
+    arm_base_link : sg90_1_L/R, pca9685 stoppers + servo 1 (fixed on base_link)
+    arm_link_1    : sg90_2 (turntable) + sg90_3 concave/convex + servo 2
+    arm_link_2    : sg90_4 concave/convex + servo 3
+    arm_link_3    : sg90_5 concave/convex (fixed finger) + servo 4
+    arm_link_4    : sg90_5_hand (moving finger)
+  Each SG90 (simplified shape) is baked into the mesh of the link its body is
+  screwed into; its horn turns the next link.
+
+  Frames: x = smabo front (smartphone side), z = up. arm_base_link sits on the
+  bottom of sg90_1 (top of the base), directly below arm_joint_1.
+  Joints (-90..+90 deg): 0 = arm straight up (the STEP pose); + on joints 2/3
+  tilts to the front.
+    arm_joint_1 yaw about z
+    arm_joint_2 / arm_joint_3 pitch about y
+    arm_joint_4 gripper about x: -90 deg = closed (STEP pose), +90 deg = fully open
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- arm on top of the smabo base: arm_joint_1 is 10 mm in front of the base centre -->
+  <xacro:macro name="smabo_arm" params="parent:=base_link">
+    <joint name="arm_mount_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="arm_base_link"/>
+      <origin xyz="0.010 0 0.090" rpy="0 0 0"/>
+    </joint>
+
+    <xacro:smabo_mesh_link name="arm_base_link" module="smabo_arm" material="smabo_mount"  mass="0.03"/>
+    <xacro:smabo_mesh_link name="arm_link_1"    module="smabo_arm" material="smabo_part"   mass="0.03"/>
+    <xacro:smabo_mesh_link name="arm_link_2"    module="smabo_arm" material="smabo_part"   mass="0.03"/>
+    <xacro:smabo_mesh_link name="arm_link_3"    module="smabo_arm" material="smabo_part"   mass="0.03"/>
+    <xacro:smabo_mesh_link name="arm_link_4"    module="smabo_arm" material="smabo_accent" mass="0.005"/>
+
+    <joint name="arm_joint_1" type="revolute">
+      <parent link="arm_base_link"/>
+      <child  link="arm_link_1"/>
+      <origin xyz="0 0 0.015" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="${-smabo_deg90}" upper="${smabo_deg90}" effort="0.2" velocity="2.0"/>
+    </joint>
+
+    <joint name="arm_joint_2" type="revolute">
+      <parent link="arm_link_1"/>
+      <child  link="arm_link_2"/>
+      <origin xyz="0 0 0.0365" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="${-smabo_deg90}" upper="${smabo_deg90}" effort="0.2" velocity="2.0"/>
+    </joint>
+
+    <joint name="arm_joint_3" type="revolute">
+      <parent link="arm_link_2"/>
+      <child  link="arm_link_3"/>
+      <origin xyz="0 0 0.0515" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="${-smabo_deg90}" upper="${smabo_deg90}" effort="0.2" velocity="2.0"/>
+    </joint>
+
+    <!-- the finger mesh is modelled closed, so the joint frame is pre-rotated
+         +90 deg (open): q = -90 deg gives the closed STEP pose -->
+    <joint name="arm_joint_4" type="revolute">
+      <parent link="arm_link_3"/>
+      <child  link="arm_link_4"/>
+      <origin xyz="0.0125 -0.0048 0.04345" rpy="${smabo_deg90} 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="${-smabo_deg90}" upper="${smabo_deg90}" effort="0.2" velocity="2.0"/>
+    </joint>
+
+    <!-- tool frame between the closed fingertips (on arm_link_3, so the 3-DOF
+         arm group ends here and the gripper stays a separate group) -->
+    <link name="arm_tool0"/>
+    <joint name="arm_tool0_joint" type="fixed">
+      <parent link="arm_link_3"/>
+      <child  link="arm_tool0"/>
+      <origin xyz="0.0125 0.0012 0.06745" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

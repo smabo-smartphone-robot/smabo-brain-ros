@@ -22,6 +22,8 @@ Arguments:
                /speech/recognized).
   use_rosbridge(true)  start rosbridge_suite.
   rosbridge_port (9090).
+  arm / hand / breadboard (true|false), mount (none|tt_motor|neck)
+               robot configuration, passed to smabo.urdf.xacro and the SRDF.
 """
 
 import os
@@ -45,6 +47,7 @@ def generate_launch_description():
     use_speech = LaunchConfiguration("use_speech")
     use_rosbridge = LaunchConfiguration("use_rosbridge")
     rosbridge_port = LaunchConfiguration("rosbridge_port")
+    model_args = {k: LaunchConfiguration(k) for k in ("arm", "hand", "breadboard", "mount")}
 
     brain_ros = get_package_share_directory("smabo_brain_ros")
     description = get_package_share_directory("smabo_description")
@@ -61,12 +64,17 @@ def generate_launch_description():
         DeclareLaunchArgument("use_speech", default_value="true"),
         DeclareLaunchArgument("use_rosbridge", default_value="true"),
         DeclareLaunchArgument("rosbridge_port", default_value="9090"),
+        DeclareLaunchArgument("arm", default_value="true"),
+        DeclareLaunchArgument("hand", default_value="false"),
+        DeclareLaunchArgument("breadboard", default_value="false"),
+        DeclareLaunchArgument("mount", default_value="none"),
 
         # --- robot model / TF ---
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(description, "launch", "description.launch.py")
             ),
+            launch_arguments=model_args.items(),
         ),
 
         # --- odometry: /wheel_vel -> /odom + tf ---
@@ -117,6 +125,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(moveit, "launch", "move_group.launch.py")
             ),
+            launch_arguments=model_args.items(),
             condition=IfCondition(use_moveit),
         ),
 

@@ -43,7 +43,7 @@ class OdomNode(Node):
 
         # Parameters mirror the ESP32 config keys the core consumes, so the
         # exact same update_config() path is reused.
-        self.declare_parameter("wheel_separation", 0.15)
+        self.declare_parameter("wheel_separation", 0.13)
         self.declare_parameter("odom_frame", "odom")
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("publish_tf", True)

@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<!--
+  smabo base: the body every configuration is built on (arm, hand, mobile
+  robot, neck, ...). Mesh from smabo-hardware/step/assembly/smabo_base.step
+  (base, covers, smartphone holders) by scripts/split_smabo_meshes.py.
+
+  base_link sits at the bottom centre of the base box; x = smabo front
+  (smartphone side), z = up. It is the URDF root, except with the neck, where
+  the floor-standing pan stand carries it.
+
+  Also defines smabo_mesh_link, used by every module xacro.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:property name="smabo_mesh_dir" value="package://smabo_description/meshes"/>
+  <xacro:property name="smabo_deg90"    value="1.5708"/>
+
+  <material name="smabo_base"><color rgba="0.60 0.64 0.70 1.0"/></material>
+  <material name="smabo_part"><color rgba="0.95 0.95 0.95 1.0"/></material>
+  <material name="smabo_mount"><color rgba="0.80 0.82 0.86 1.0"/></material>
+  <material name="smabo_accent"><color rgba="0.98 0.57 0.24 1.0"/></material>
+  <material name="smabo_dark"><color rgba="0.15 0.15 0.18 1.0"/></material>
+
+  <!-- link with meshes/<module>/{visual,collision}/<name>.stl; mass/inertia are
+       rough placeholders (planning/viz only) -->
+  <xacro:macro name="smabo_mesh_link" params="name module material mass">
+    <link name="${name}">
+      <visual>
+        <geometry><mesh filename="${smabo_mesh_dir}/${module}/visual/${name}.stl"/></geometry>
+        <material name="${material}"/>
+      </visual>
+      <collision>
+        <geometry><mesh filename="${smabo_mesh_dir}/${module}/collision/${name}.stl"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="${mass}"/>
+        <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <xacro:macro name="smabo_base">
+    <xacro:smabo_mesh_link name="base_link" module="smabo_base" material="smabo_base" mass="0.30"/>
+  </xacro:macro>
+
+  <!-- rear breadboard / PCA9685 mounts (smabo_base_breadboard.step), used by the
+       hand, mobile and neck configurations -->
+  <xacro:macro name="smabo_breadboard">
+    <xacro:smabo_mesh_link name="breadboard_link" module="smabo_breadboard" material="smabo_mount" mass="0.02"/>
+    <joint name="breadboard_joint" type="fixed">
+      <parent link="base_link"/>
+      <child  link="breadboard_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!--
+  smabo mobile chassis (TT gear motors) under the smabo base.
+  Meshes split from smabo-hardware/step/assembly/smabo_tt_motor.step by
+  scripts/split_smabo_meshes.py.
+
+  Links (STEP parts):
+    chassis_link     : tt_motor_bottom, tt_motor_stopper1/2, dc_motor_caster
+                       + both TT motors (simplified, SunFounder drawing)
+                       + ball caster (simplified, height set so the base stands level)
+    left/right_wheel_link : wheel (simplified, radius from smabo-esp32 config)
+  The motors, wheels and caster are not in the STEP: the motor shaft position
+  comes from the motor brackets (shaft 11.0 mm from the gearbox end), the wheel
+  sits just outside the bracket. Wheel separation 0.130 m (measured, centre to
+  centre of the tyres), wheel radius 0.030 m; the ground is 0.04985 m below
+  base_link.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="smabo_wheel" params="side y">
+    <xacro:smabo_mesh_link name="${side}_wheel_link" module="smabo_tt_motor" material="smabo_dark" mass="0.03"/>
+    <joint name="${side}_wheel_joint" type="continuous">
+      <parent link="chassis_link"/>
+      <child  link="${side}_wheel_link"/>
+      <origin xyz="-0.0215 ${y} -0.01985" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="smabo_tt_motor" params="parent:=base_link">
+    <joint name="chassis_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="chassis_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <xacro:smabo_mesh_link name="chassis_link" module="smabo_tt_motor" material="smabo_mount" mass="0.15"/>
+
+    <xacro:smabo_wheel side="left"  y="0.065"/>
+    <xacro:smabo_wheel side="right" y="-0.065"/>
+  </xacro:macro>
+
+</robot>

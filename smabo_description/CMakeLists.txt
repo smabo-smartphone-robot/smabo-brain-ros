@@ -6,7 +6,7 @@ find_package(ament_cmake REQUIRED)
 # Install model / launch assets so other packages (nav2, moveit, bringup) and
 # `xacro $(find smabo_description)/urdf/...` can locate them.
 install(
-  DIRECTORY urdf launch rviz
+  DIRECTORY urdf launch rviz meshes
   DESTINATION share/${PROJECT_NAME}
 )
 

@@ -1,7 +1,7 @@
 """MoveIt execution endpoint for the smabo servo arm.
 
-Exposes a ``control_msgs/FollowJointTrajectory`` action server (the controller
-MoveIt's moveit_controllers.yaml points at) and republishes each planned
+Exposes one ``control_msgs/FollowJointTrajectory`` action server per MoveIt
+controller in moveit_controllers.yaml (arm and gripper) and republishes each planned
 trajectory on ``/servo/command`` as ``trajectory_msgs/JointTrajectory`` — which
 is exactly the shape smabo-esp32 expects over rosbridge (see design.md §4-5 and
 smabo-web ``Arm.tsx``).  The ESP32 does the time-based following itself, so this
@@ -42,12 +42,15 @@ class ServoTrajectoryBridge(Node):
     def __init__(self) -> None:
         super().__init__("servo_trajectory_bridge")
 
-        self.declare_parameter("action_name", "smabo_arm_controller/follow_joint_trajectory")
+        self.declare_parameter("action_names", [
+            "smabo_arm_controller/follow_joint_trajectory",
+            "smabo_gripper_controller/follow_joint_trajectory",
+        ])
         self.declare_parameter("command_topic", "/servo/command")
         self.declare_parameter("simulate", False)
         self.declare_parameter("joint_states_rate", 20.0)
 
-        action_name = self.get_parameter("action_name").value
+        action_names = list(self.get_parameter("action_names").value)
         command_topic = self.get_parameter("command_topic").value
         self._simulate = bool(self.get_parameter("simulate").value)
 
@@ -57,15 +60,18 @@ class ServoTrajectoryBridge(Node):
 
         self._cmd_pub = self.create_publisher(JointTrajectory, command_topic, 10)
 
-        self._server = ActionServer(
-            self,
-            FollowJointTrajectory,
-            action_name,
-            execute_callback=self._execute,
-            goal_callback=lambda _g: GoalResponse.ACCEPT,
-            cancel_callback=lambda _g: CancelResponse.ACCEPT,
-            callback_group=self._cb_group,
-        )
+        self._servers = [
+            ActionServer(
+                self,
+                FollowJointTrajectory,
+                name,
+                execute_callback=self._execute,
+                goal_callback=lambda _g: GoalResponse.ACCEPT,
+                cancel_callback=lambda _g: CancelResponse.ACCEPT,
+                callback_group=self._cb_group,
+            )
+            for name in action_names
+        ]
 
         # Simulated joint state (only published when simulate:=true).
         self._positions = {j: 0.0 for j in _ALL_JOINTS}
@@ -77,7 +83,7 @@ class ServoTrajectoryBridge(Node):
             )
 
         self.get_logger().info(
-            f"servo_trajectory_bridge ready (action='{action_name}', "
+            f"servo_trajectory_bridge ready (actions={action_names}, "
             f"command='{command_topic}', simulate={self._simulate})"
         )
 

@@ -3,6 +3,10 @@
 Other bringup launches include this to get TF for the static links. Joint angles
 for the servo joints normally come from /joint_states (ESP32 via rosbridge); set
 ``use_jsp_gui:=true`` to drive them manually when running standalone.
+
+The configuration is picked with the xacro args of smabo.urdf.xacro, passed
+through as launch args: ``arm`` / ``hand`` / ``breadboard`` (true|false) and
+``mount`` (none|tt_motor|neck).
 """
 
 from launch import LaunchDescription
@@ -18,13 +22,17 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     use_jsp_gui = LaunchConfiguration("use_jsp_gui")
     use_rviz = LaunchConfiguration("use_rviz")
+    model_args = [" arm:=", LaunchConfiguration("arm"),
+                  " hand:=", LaunchConfiguration("hand"),
+                  " breadboard:=", LaunchConfiguration("breadboard"),
+                  " mount:=", LaunchConfiguration("mount")]
 
     xacro_path = PathJoinSubstitution(
         [FindPackageShare("smabo_description"), "urdf", "smabo.urdf.xacro"]
     )
     robot_description = {
         "robot_description": Command(
-            [FindExecutable(name="xacro"), " ", xacro_path]
+            [FindExecutable(name="xacro"), " ", xacro_path, *model_args]
         )
     }
     rviz_cfg = PathJoinSubstitution(
@@ -34,6 +42,10 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("use_jsp_gui", default_value="false"),
         DeclareLaunchArgument("use_rviz", default_value="false"),
+        DeclareLaunchArgument("arm", default_value="true"),
+        DeclareLaunchArgument("hand", default_value="false"),
+        DeclareLaunchArgument("breadboard", default_value="false"),
+        DeclareLaunchArgument("mount", default_value="none"),
 
         Node(
             package="robot_state_publisher",

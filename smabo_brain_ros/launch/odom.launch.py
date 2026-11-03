@@ -10,7 +10,7 @@ def generate_launch_description():
             name="odom",
             output="screen",
             parameters=[{
-                "wheel_separation": 0.15,
+                "wheel_separation": 0.13,
                 "odom_frame": "odom",
                 "base_frame": "base_link",
                 "publish_tf": True,

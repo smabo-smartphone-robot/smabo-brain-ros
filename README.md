@@ -191,7 +191,7 @@ cd ../smabo-web && npm install && npm run dev   # Navigation / Motion Plan タ�
   （`trajectory_msgs/JointTrajectory`）へ転送するだけ。時間追従は ESP32 側が行う
   （design.md §4-5）。`simulate:=true` のときのみ `/joint_states` を疑似配信。
 - ロボットモデル（`smabo_description`）は smabo-esp32 の関節・車輪ジオメトリに整合
-  （`arm_joint_1..4`・`head_pan`・`left/right_hand`、`wheel_separation=0.15`）。
+  （`arm_joint_1..4`・`head_pan`・`left/right_hand`、`wheel_separation=0.13`）。
 - ESP32 側（smabo-esp32）は `brain.rosbridge:true` で rosbridge に接続し、接続時に
   送信トピックを advertise・受信トピックを subscribe します。`/scan` は LD06 を UART 直結し
   `modes.lidar` で配信（`lidar_ld06.py`）。詳細は smabo-esp32 の README を参照。

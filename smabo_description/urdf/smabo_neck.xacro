@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!--
+  smabo neck: floor-standing pan stand (MG996R) that turns the whole smabo base.
+  Meshes split from smabo-hardware/step/assembly/smabo_neck.step by
+  scripts/split_smabo_meshes.py.
+
+  Links (STEP parts):
+    pan_stand_link : pan_stand_left/right + MG996R (simplified). URDF root, on the floor.
+    pan_link       : pan_plate_top + pan_adapter; carries base_link (fixed)
+  Joint head_pan (-90..+90 deg) about z through the MG996R shaft; 0 = the STEP
+  pose (smabo facing +x of the stand).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="smabo_neck" params="child:=base_link">
+    <xacro:smabo_mesh_link name="pan_stand_link" module="smabo_neck" material="smabo_mount" mass="0.10"/>
+    <xacro:smabo_mesh_link name="pan_link"       module="smabo_neck" material="smabo_part"  mass="0.05"/>
+
+    <joint name="head_pan" type="revolute">
+      <parent link="pan_stand_link"/>
+      <child  link="pan_link"/>
+      <origin xyz="0 0 0.0438" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="${-smabo_deg90}" upper="${smabo_deg90}" effort="1.0" velocity="2.0"/>
+    </joint>
+
+    <joint name="pan_mount_joint" type="fixed">
+      <parent link="pan_link"/>
+      <child  link="${child}"/>
+      <origin xyz="0 0 0.015" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

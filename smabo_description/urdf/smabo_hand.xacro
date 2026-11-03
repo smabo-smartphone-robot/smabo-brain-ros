@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!--
+  smabo hands: one SG90-driven hand on each side of the smabo base.
+  Meshes split from smabo-hardware/step/assembly/smabo_hand.step by
+  scripts/split_smabo_meshes.py.
+
+  Links (STEP parts):
+    hand_mount_link : sg90_plate_1/2 on both sides + both SG90s (fixed on base_link)
+    left_hand_link  : sg90_base + arm_hand on the left (+y) side
+    right_hand_link : sg90_base + arm_hand on the right (-y) side
+  The STEP has sg90_base/arm_hand centred on the edge of the servo pocket; they
+  are moved 6.9 mm so they turn about the SG90 shaft (servo shaft toward the
+  plate centre).
+
+  Joints (-90..+90 deg): 0 = the STEP pose (hand hanging down), + raises the
+  hand toward the front.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="smabo_hand_side" params="side x y">
+    <xacro:smabo_mesh_link name="${side}_hand_link" module="smabo_hand" material="smabo_accent" mass="0.02"/>
+    <joint name="${side}_hand" type="revolute">
+      <parent link="hand_mount_link"/>
+      <child  link="${side}_hand_link"/>
+      <origin xyz="${x} ${y} 0.050" rpy="0 0 0"/>
+      <axis xyz="0 -1 0"/>
+      <limit lower="${-smabo_deg90}" upper="${smabo_deg90}" effort="0.2" velocity="2.0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="smabo_hand" params="parent:=base_link">
+    <joint name="hand_mount_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="hand_mount_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <xacro:smabo_mesh_link name="hand_mount_link" module="smabo_hand" material="smabo_mount" mass="0.04"/>
+
+    <xacro:smabo_hand_side side="left"  x="0.0003"  y="0.052"/>
+    <xacro:smabo_hand_side side="right" x="-0.0003" y="-0.052"/>
+  </xacro:macro>
+
+</robot>
