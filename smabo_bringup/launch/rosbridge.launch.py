@@ -1,7 +1,7 @@
 """rosbridge_suite — the single WS<->ROS2 boundary for smabo.
 
 smabo-web / smabo-app / smabo-esp32 connect here over WebSocket (default :9090,
-the same port the legacy smabo-brain relay used, so it is a drop-in). rosapi is
+the same port smabo-brain uses, so clients need no change). rosapi is
 included so the web client can query topics/services for the 3D viewer.
 """
 

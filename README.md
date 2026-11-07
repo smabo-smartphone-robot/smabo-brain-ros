@@ -7,7 +7,7 @@ ROS 2 のエコシステム（**rosbridge_suite / Nav2 / MoveIt2**）でナビ�
 > 設計方針: **ROS 2 通信はこのリポジトリ内部だけ**で使い、外部（smabo-web / smabo-app /
 > smabo-esp32）とは **rosbridge_suite による WebSocket ↔ ROS 2 相互変換**で接続します。
 > 積分などのアルゴリズムは smabo-brain 側の1か所に集約し、こちらは ROS 時刻・メッセージ・
-> tf・アクションへの変換だけを担います（WebSocket 版の中継は smabo-brain の `relay.py`）。
+> tf・アクションへの変換だけを担います（WebSocket 版の中継は smabo-brain の `server.py`）。
 
 ## パッケージ構成
 
