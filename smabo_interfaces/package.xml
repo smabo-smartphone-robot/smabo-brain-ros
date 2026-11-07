@@ -3,7 +3,7 @@
 <package format="3">
   <name>smabo_interfaces</name>
   <version>0.1.0</version>
-  <description>Custom messages for smabo (raw wheel velocities, etc.).</description>
+  <description>Custom messages and services for smabo (raw wheel velocities, robot-model files, etc.).</description>
   <maintainer email="daigaku.robot@gmail.com">smabo</maintainer>
   <license>MIT</license>
 

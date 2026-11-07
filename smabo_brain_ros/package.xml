@@ -20,6 +20,7 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>topic_tools</exec_depend>
   <exec_depend>smabo_interfaces</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
 
   <!-- Python logic dependency 'brain' (smabo-brain) is not a ROS package;
        install it via pip or PYTHONPATH (see README). -->

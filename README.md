@@ -13,15 +13,15 @@ ROS 2 のエコシステム（**rosbridge_suite / Nav2 / MoveIt2**）でナビ�
 
 | パッケージ | ビルドタイプ | 内容 |
 |-----------|------------|------|
-| `smabo_interfaces` | ament_cmake | カスタムメッセージ（`WheelVel.msg` = left/right/dt） |
-| `smabo_brain_ros`  | ament_python | `odom_node`（`/wheel_vel`→`/odom`+tf）、`servo_trajectory_bridge`（MoveIt の FollowJointTrajectory→`/servo/command`）、`webrtc_camera_node`（smabo-app の WebRTC 映像を終端し `sensor_msgs/Image`＝`/camera/image_raw` を publish、`brain.webrtc_hub` 再利用）、`image_processor_node`＋`gaze`/`neck`/`drive`\_policy\_node（画像処理、`brain.vision` 再利用）、`speech_recognizer_node`（`/speech/audio`→STT→`/speech/recognized`、`brain.stt` 再利用）、`relays.launch.py`（送信元 prefix 剥がし） |
-| `smabo_description` | ament_cmake | URDF/xacro ロボットモデル（差動二輪＋LD06＋4自由度アーム。esp32 config に整合） |
-| `smabo_moveit_config` | ament_cmake | MoveIt2 設定（`arm` グループ＝`arm_joint_1..4`、`head`＝`head_pan`） |
+| `smabo_interfaces` | ament_cmake | カスタムメッセージ（`WheelVel.msg` = left/right/dt）とサービス（`GetFile.srv` = URDF / SRDF / メッシュの取得） |
+| `smabo_brain_ros`  | ament_python | `odom_node`（`/wheel_vel`→`/odom`+tf）、`servo_trajectory_bridge`（MoveIt の FollowJointTrajectory→`/servo/command`）、`webrtc_camera_node`（smabo-app の WebRTC 映像を終端し `sensor_msgs/Image`＝`/camera/image_raw` を publish、`brain.webrtc_hub` 再利用）、`image_processor_node`＋`gaze`/`neck`/`drive`\_policy\_node（画像処理、`brain.vision` 再利用）、`speech_recognizer_node`（`/speech/audio`→STT→`/speech/recognized`、`brain.stt` 再利用）、`robot_model_server`（URDF / SRDF / メッシュを `/smabo/get_file` で rosbridge クライアントへ提供）、`relays.launch.py`（送信元 prefix 剥がし） |
+| `smabo_description` | ament_cmake | URDF/xacro ロボットモデル。smabo-hardware の STEP から生成したメッシュ（`scripts/split_smabo_meshes.py`）。共通の `base_link` に arm / hand / breadboard / tt_motor / neck を xacro 引数で取り付け |
+| `smabo_moveit_config` | ament_cmake | MoveIt2 設定（SRDF は xacro。`arm` グループ＝`arm_joint_1..3`（位置のみの IK）、`gripper`＝`arm_joint_4`、`head`＝`head_pan`（`mount:=neck` 時）） |
 | `smabo_navigation` | ament_cmake | Nav2 設定（costmap は `/scan`、AMCL/SLAM、プレースホルダ地図） |
-| `smabo_bringup` | ament_cmake | 一括起動 launch（rosbridge＋relays＋odom＋RSP＋Nav2＋MoveIt）と Docker 連携 |
+| `smabo_bringup` | ament_cmake | 一括起動 launch（rosbridge＋relays＋odom＋RSP＋Nav2＋MoveIt＋vision＋speech）と Docker 連携 |
 
 > 現状は **ビルド可能な雛形（scaffold）**です。sim/単体で起動確認できる状態までを対象とし、
-> 実機での地図作成・Nav2/MoveIt のゲイン調整・メッシュ精密化は次のステップです。
+> 実機での地図作成・Nav2/MoveIt のゲイン調整は次のステップです。
 
 ## システム構成（トポロジ）
 
@@ -98,8 +98,31 @@ docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py sl
 |---|---|---|
 | `sim` | `false` | アームを疑似化（`servo_trajectory_bridge` が `/joint_states` を配信） |
 | `slam` | `false` | AMCL+地図の代わりに slam_toolbox で地図作成 |
-| `use_nav` / `use_moveit` / `use_rosbridge` | `true` | 各サブシステムの起動可否 |
+| `use_nav` / `use_moveit` / `use_vision` / `use_speech` / `use_rosbridge` | `true` | 各サブシステムの起動可否 |
 | `rosbridge_port` | `9090` | rosbridge のポート |
+| `arm` / `hand` / `breadboard` | `true` / `false` / `false` | ロボットの構成（URDF・SRDF の xacro 引数） |
+| `mount` | `none` | `none` / `tt_motor`（移動台車） / `neck`（床置きのパン台） |
+
+## ロボットモデル
+
+`smabo_description/urdf/smabo.urdf.xacro` を xacro 引数で構成します（`description.launch.py`・
+`move_group.launch.py`・`bringup.launch.py` も同じ引数を受け取ります）。
+
+```bash
+xacro smabo.urdf.xacro arm:=false hand:=true breadboard:=true mount:=neck
+```
+
+| モジュール | xacro | 主なリンク / 関節 |
+|---|---|---|
+| base（共通） | `smabo_base.xacro` | `base_link`（ベースの箱の底面中央、x＝前） |
+| breadboard | `smabo_base.xacro` | `breadboard_link`（fixed） |
+| arm | `smabo_arm.xacro` | `arm_base_link` → `arm_joint_1`〜`3` → `arm_tool0`、グリッパ `arm_joint_4`（−90° 閉〜＋90° 開） |
+| hand | `smabo_hand.xacro` | `hand_mount_link`、`left_hand` / `right_hand`（＋で前へ上がる） |
+| tt_motor | `smabo_tt_motor.xacro` | `chassis_link`、`left/right_wheel_joint`（半径 0.030 m、間隔 0.130 m）、`laser`（仮） |
+| neck | `smabo_neck.xacro` | `pan_stand_link`（根）→ `head_pan` → `pan_link` → `base_link` |
+
+SG90・MG996R・TT モータ・車輪・キャスターは STEP に無いため、簡易形状でメッシュに含めています。
+メッシュの再生成は `python3 smabo_description/scripts/split_smabo_meshes.py smabo_description/meshes`。
 
 ## ローカル（ネイティブ ROS 2）で起動
 
@@ -120,8 +143,13 @@ ros2 launch smabo_brain_ros vision.launch.py mode:=aruco   # 画像処理一式
 
 `brain.vision`（smabo-brain の純ロジック）を ROS ノードでラップしたもの。検出は
 `image_processor_node`、行動は gaze / neck / drive の各 policy ノードに分かれ、
-いずれも `brain.vision` の同じ関数を使うので smabo-brain の WS リレーと挙動が一致
-します。
+いずれも `brain.vision` の同じ関数を使います。ただし smabo-brain の WS リレーとは次の点が
+異なります。
+
+- policy ノードは `/vision/config` の `behaviors`（look_at / servo / drive）を参照せず、
+  `/vision/detections` を受けるたびにそれぞれ出力します。
+- 首・走行の追従は PID の状態を持たず、ゲイン（`servo_gain`・`drive_k_ang`/`drive_k_lin`）による
+  比例制御です。
 
 | ノード | 入力 | 出力 |
 |---|---|---|
@@ -148,11 +176,15 @@ smabo-web に **Navigation**・**Motion Plan** タブを追加しました（ros
 
 - **Navigation**: `/map`・`/scan`・ロボット URDF を 3D 表示し、`/initialpose` の設定と
   `navigate_to_pose` アクションによる目標指定（Nav2 の RViz 相当）。
-- **Motion Plan**: アーム URDF を 3D 表示し、関節目標から MoveIt の `move_action` で
-  計画・実行、または `/servo/command` への直接指令（MoveIt の RViz 相当）。
+- **Motion Plan**: MoveIt の MotionPlanning パネル相当。URDF・SRDF・メッシュを
+  `robot_model_server`（`/smabo/get_file`）から rosbridge 経由で取得して three.js で描画し、
+  現在の姿勢（`/joint_states`）・目標姿勢（半透明）・計画した軌道（アニメーション）を表示。
+  目標は関節スライダー・SRDF の登録姿勢・アーム先端のドラッグ（`/compute_ik` による位置のみの IK）で
+  指定し、`/plan_kinematic_path` で計画、`/execute_trajectory` で実行します。rosbridge が
+  アクションに対応していない場合は、計画した軌道を `/servo/command` へ直接送れます。
 
-ヘッダの brain ホスト（既定 `localhost:9090`）に rosbridge のアドレスを入れて
-「Connect ROS」します。
+ヘッダの brain ホスト（既定 `smabo-brain.local:9090`）に rosbridge のアドレスを入れて、
+各タブの「Connect ROS」で接続します。
 
 > **TF と tf2_web_republisher**: ros3djs の `TFClient` は `tf2_web_republisher` を前提とします。
 > 3D ビューでロボット・スキャンを正しい位置に描画するには ROS 側でこれを起動してください
@@ -175,8 +207,9 @@ ros2 topic pub -r 20 /esp32/wheel_vel smabo_interfaces/msg/WheelVel \
 ros2 topic echo /odom
 
 # 3) MoveIt 実行が /servo/command を出すか
-ros2 action list    # /smabo_arm_controller/follow_joint_trajectory, /move_action
-ros2 topic echo /servo/command            # Motion Plan の Plan&Execute で出力
+ros2 action list    # /smabo_arm_controller/follow_joint_trajectory, /smabo_gripper_controller/follow_joint_trajectory, /move_action, /execute_trajectory
+ros2 service list | grep -E 'get_file|compute_ik|plan_kinematic_path'
+ros2 topic echo /servo/command            # Motion Plan の Execute で出力
 
 # 4) web
 cd ../smabo-web && npm install && npm run dev   # Navigation / Motion Plan タブ
@@ -187,10 +220,10 @@ cd ../smabo-web && npm install && npm run dev   # Navigation / Motion Plan タ�
 - 積分ロジックは **smabo-brain の `brain.odometry.Odometry`** をそのまま使用（重複実装しない）。
 - 送信元 prefix の定義は **`brain.topics`** に集約し、ここの `relays.launch.py` が
   `topic_tools relay` で同じ対応を ROS 側に展開（twist_mux/remap 移行の素地）。
-- `servo_trajectory_bridge` は MoveIt の `FollowJointTrajectory` を `/servo/command`
-  （`trajectory_msgs/JointTrajectory`）へ転送するだけ。時間追従は ESP32 側が行う
-  （design.md §4-5）。`simulate:=true` のときのみ `/joint_states` を疑似配信。
-- ロボットモデル（`smabo_description`）は smabo-esp32 の関節・車輪ジオメトリに整合
+- `servo_trajectory_bridge` は MoveIt の `FollowJointTrajectory`（arm・gripper の 2 アクション）を
+  `/servo/command`（`trajectory_msgs/JointTrajectory`）へ転送するだけ。時間追従は ESP32 側が行う。
+  `simulate:=true` のときのみ `/joint_states` を疑似配信。
+- ロボットモデル（`smabo_description`）は smabo-esp32 の関節名・角度範囲・車輪ジオメトリに整合
   （`arm_joint_1..4`・`head_pan`・`left/right_hand`、`wheel_separation=0.13`）。
 - ESP32 側（smabo-esp32）は `brain.rosbridge:true` で rosbridge に接続し、接続時に
   送信トピックを advertise・受信トピックを subscribe します。`/scan` は LD06 を UART 直結し

@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-xacro \
       ros-humble-topic-tools \
       ros-humble-audio-common-msgs \
+      ros-humble-vision-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # tf2_web_republisher feeds TF to the ros3djs viewer in smabo-web. It may not be

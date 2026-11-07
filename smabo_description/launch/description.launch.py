@@ -16,6 +16,7 @@ from launch.substitutions import (
     Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution,
 )
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -31,8 +32,9 @@ def generate_launch_description():
         [FindPackageShare("smabo_description"), "urdf", "smabo.urdf.xacro"]
     )
     robot_description = {
-        "robot_description": Command(
-            [FindExecutable(name="xacro"), " ", xacro_path, *model_args]
+        "robot_description": ParameterValue(
+            Command([FindExecutable(name="xacro"), " ", xacro_path, *model_args]),
+            value_type=str,
         )
     }
     rviz_cfg = PathJoinSubstitution(

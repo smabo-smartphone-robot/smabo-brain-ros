@@ -7,6 +7,7 @@ Composes, in one place:
   - rosbridge_suite                                   → WS<->ROS2 for web/app/esp32
   - Nav2 (+ AMCL or SLAM)                             → /odom,/scan -> /cmd_vel
   - MoveIt2 move_group + servo_trajectory_bridge      → arm planning -> /servo/command
+  - robot_model_server (smabo_brain_ros)              → URDF / SRDF / meshes for smabo-web (/smabo/get_file)
   - vision (webrtc_camera + image_processor + policies)→ WebRTC video -> detections -> behaviours
   - speech_recognizer                                 → /speech/audio (STT) -> /speech/recognized
 
@@ -14,6 +15,8 @@ Arguments:
   sim          (false) simulate the arm: servo_trajectory_bridge publishes
                /joint_states from commands (no ESP32 needed for MoveIt).
   slam         (false) build a map with slam_toolbox instead of AMCL+map.
+  map          map yaml for AMCL (default: smabo_navigation/maps/empty_map.yaml).
+               For smabo-sim use maps/sim_room.yaml (exported from its world).
   use_nav      (true)  start Nav2.
   use_moveit   (true)  start MoveIt2 + the servo trajectory bridge.
   use_vision   (true)  start the vision pipeline (webrtc_camera ingests the
@@ -64,6 +67,8 @@ def generate_launch_description():
         DeclareLaunchArgument("use_speech", default_value="true"),
         DeclareLaunchArgument("use_rosbridge", default_value="true"),
         DeclareLaunchArgument("rosbridge_port", default_value="9090"),
+        DeclareLaunchArgument(
+            "map", default_value=os.path.join(navigation, "maps", "empty_map.yaml")),
         DeclareLaunchArgument("arm", default_value="true"),
         DeclareLaunchArgument("hand", default_value="false"),
         DeclareLaunchArgument("breadboard", default_value="false"),
@@ -105,6 +110,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(navigation, "launch", "nav2.launch.py")
             ),
+            launch_arguments={"map": LaunchConfiguration("map")}.items(),
             condition=IfCondition(PythonExpression(
                 ["'", use_nav, "' == 'true' and '", slam, "' == 'false'"]
             )),
@@ -137,6 +143,15 @@ def generate_launch_description():
             output="screen",
             parameters=[{"simulate": ParameterValue(sim, value_type=bool)}],
             condition=IfCondition(use_moveit),
+        ),
+
+        # --- robot model server (URDF / SRDF / meshes over rosbridge for smabo-web) ---
+        Node(
+            package="smabo_brain_ros",
+            executable="robot_model_server",
+            name="robot_model_server",
+            output="screen",
+            condition=IfCondition(use_rosbridge),
         ),
 
         # --- vision: webrtc_camera (WebRTC video -> /camera/image_raw) + detection + policies ---

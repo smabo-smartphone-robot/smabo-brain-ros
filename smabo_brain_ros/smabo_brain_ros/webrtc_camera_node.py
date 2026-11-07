@@ -25,8 +25,10 @@ aiortc is imported lazily by ``brain.webrtc_hub``; without it the node logs a
 warning and idles (the rest of the graph still runs).
 """
 
+import array
 import asyncio
 import json
+import os
 import threading
 
 import numpy as np
@@ -36,10 +38,12 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
-from brain.webrtc_hub import WebRtcHub
+from brain.webrtc_hub import WebRtcHub, prefer_ice_networks
 
-# Single logical web preview peer (rosbridge has no per-client addressing, and a
-# preview is shown by one viewer at a time). Used as the hub's web "ws" key.
+# rosbridge has no per-client addressing: /webrtc/web_offer reaches every open
+# smabo-web. So each web client names itself with a "peer" id in its preview /
+# answer / ICE JSON, the node keeps one hub peer per id, and stamps the id into
+# the offer so only that client answers. Clients without an id share this key.
 _WEB_PEER = "web"
 
 
@@ -51,8 +55,13 @@ class WebRtcCameraNode(Node):
         self.declare_parameter("image_topic", "camera/image_raw")
         self.declare_parameter("config_topic", "vision/config")
         self.declare_parameter("capture_fps", 30.0)
+        # Comma-separated CIDRs whose host ICE candidates are tried first (see
+        # brain.webrtc_hub.prefer_ice_networks); docker-compose sets it for
+        # Docker Desktop. Empty = aioice's default (no preference).
+        self.declare_parameter("ice_prefer_networks", os.environ.get("SMABO_ICE_PREFER", ""))
 
         self._frame_id = self.get_parameter("frame_id").value
+        prefer_ice_networks(str(self.get_parameter("ice_prefer_networks").value).split(","))
 
         self._img_pub = self.create_publisher(
             Image, self.get_parameter("image_topic").value, 10)
@@ -107,9 +116,16 @@ class WebRtcCameraNode(Node):
 
     # ----------------------------------------------------- hub callbacks
     async def _publish_frame(self, bgr) -> None:
-        """Hub hands us a BGR ndarray → publish it as sensor_msgs/Image."""
+        """Hub hands us a BGR ndarray → publish it as sensor_msgs/Image.
+
+        Building and publishing a ~1 MB Image runs on a worker thread so the
+        asyncio loop (ICE / DTLS / RTP for every peer) never stalls on it.
+        """
         if bgr is None or bgr.ndim != 3:
             return
+        await asyncio.get_running_loop().run_in_executor(None, self._publish_image, bgr)
+
+    def _publish_image(self, bgr) -> None:
         h, w = bgr.shape[:2]
         msg = Image()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -119,13 +135,24 @@ class WebRtcCameraNode(Node):
         msg.encoding = "bgr8"
         msg.is_bigendian = 0
         msg.step = int(w * 3)
-        msg.data = np.ascontiguousarray(bgr).tobytes()
+        # array('B') takes rclpy's fast path; assigning bytes makes the generated
+        # setter type-check all ~1M elements in Python (~1-2 s per frame).
+        data = array.array("B")
+        data.frombytes(np.ascontiguousarray(bgr).tobytes())
+        msg.data = data
         self._img_pub.publish(msg)
 
     async def _send_app(self, frame: dict) -> None:
         self._publish_signaling(frame)
 
-    async def _send_web(self, _ws, frame: dict) -> None:
+    async def _send_web(self, ws, frame: dict) -> None:
+        msg = frame.get("msg") or {}
+        try:
+            d = json.loads(msg.get("data") or "{}")
+            d["peer"] = ws                 # addressee: only this client answers
+            frame = {**frame, "msg": {**msg, "data": json.dumps(d)}}
+        except Exception:
+            pass
         self._publish_signaling(frame)
 
     def _publish_signaling(self, frame: dict) -> None:
@@ -142,18 +169,25 @@ class WebRtcCameraNode(Node):
     def _on_app_ice(self, msg: String) -> None:
         self._submit(self._hub.add_app_ice(self._data(msg)))
 
+    @staticmethod
+    def _peer(d: dict) -> str:
+        p = d.get("peer")
+        return p if isinstance(p, str) and p else _WEB_PEER
+
     def _on_preview(self, msg: String) -> None:
-        on = bool(self._data(msg).get("on"))
-        if on:
-            self._submit(self._hub.start_web_preview(_WEB_PEER))
+        d = self._data(msg)
+        if d.get("on"):
+            self._submit(self._hub.start_web_preview(self._peer(d)))
         else:
-            self._submit(self._hub.stop_web_preview(_WEB_PEER))
+            self._submit(self._hub.stop_web_preview(self._peer(d)))
 
     def _on_web_answer(self, msg: String) -> None:
-        self._submit(self._hub.handle_web_answer(_WEB_PEER, self._data(msg)))
+        d = self._data(msg)
+        self._submit(self._hub.handle_web_answer(self._peer(d), d))
 
     def _on_web_ice(self, msg: String) -> None:
-        self._submit(self._hub.add_web_ice(_WEB_PEER, self._data(msg)))
+        d = self._data(msg)
+        self._submit(self._hub.add_web_ice(self._peer(d), d))
 
     def _on_config(self, msg: String) -> None:
         try:

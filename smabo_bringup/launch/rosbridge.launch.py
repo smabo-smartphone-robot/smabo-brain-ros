@@ -33,6 +33,11 @@ def generate_launch_description():
                 # smabo clients publish/subscribe in rosbridge v2 JSON.
                 "call_services_in_new_thread": True,
                 "send_action_goals_in_new_thread": True,
+                # The node's own default is 1 MB; larger messages are split into
+                # "fragment" ops, which roslibjs cannot reassemble. Meshes served by
+                # /smabo/get_file (base_link.stl ≈ 1 MB → ~1.4 MB base64) exceed it.
+                # 10 MB matches rosbridge's official launch file default.
+                "max_message_size": 10000000,
             }],
         ),
         Node(
