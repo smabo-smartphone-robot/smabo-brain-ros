@@ -17,7 +17,7 @@ ROS 2 のエコシステム（**rosbridge_suite / Nav2 / MoveIt2**）でナビ�
 | `smabo_brain_ros`  | ament_python | `odom_node`（`/wheel_vel`→`/odom`+tf）、`servo_trajectory_bridge`（MoveIt の FollowJointTrajectory→`/servo/command`）、`webrtc_camera_node`（smabo-app の WebRTC 映像を終端し `sensor_msgs/Image`＝`/camera/image_raw` を publish、`brain.webrtc_hub` 再利用）、`image_processor_node`＋`gaze`/`neck`/`drive`\_policy\_node（画像処理、`brain.vision` 再利用）、`speech_recognizer_node`（`/speech/audio`→STT→`/speech/recognized`、`brain.stt` 再利用）、`robot_model_server`（URDF / SRDF / メッシュを `/smabo/get_file` で rosbridge クライアントへ提供）、`relays.launch.py`（送信元 prefix 剥がし） |
 | `smabo_description` | ament_cmake | URDF/xacro ロボットモデル。smabo-hardware の STEP から生成したメッシュ（`scripts/split_smabo_meshes.py`）。共通の `base_link` に arm / hand / breadboard / tt_motor / neck を xacro 引数で取り付け |
 | `smabo_moveit_config` | ament_cmake | MoveIt2 設定（SRDF は xacro。`arm` グループ＝`arm_joint_1..3`（位置のみの IK）、`gripper`＝`arm_joint_4`、`head`＝`head_pan`（`mount:=neck` 時）） |
-| `smabo_navigation` | ament_cmake | Nav2 設定（costmap は `/scan`、AMCL/SLAM、プレースホルダ地図） |
+| `smabo_navigation` | ament_cmake | Nav2 設定（costmap は `/scan`、AMCL/SLAM、プレースホルダ地図）。`nav_manager`（SLAM↔AMCL 切替・地図保存）は `smabo_brain_ros` |
 | `smabo_bringup` | ament_cmake | 一括起動 launch（rosbridge＋relays＋odom＋RSP＋Nav2＋MoveIt＋vision＋speech）と Docker 連携 |
 
 > 現状は **ビルド可能な雛形（scaffold）**です。sim/単体で起動確認できる状態までを対象とし、
@@ -85,9 +85,11 @@ docker compose up           # 既定で bringup.launch.py を起動
 # sim（実機なし。MoveIt 用に servo_trajectory_bridge が /joint_states を疑似配信）
 docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py sim:=true
 
-# SLAM で地図作成しながらナビ
+# SLAM（地図作成）モードで起動
 docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py slam:=true
 ```
+
+SLAM ↔ ナビの切り替えは再起動不要で、smabo-web の Navigation タブから行えます（下記「地図作成からナビゲーションまで」）。
 
 ホストネットワークで `:9090` を公開するので、smabo-web / ESP32 から
 `ws://<このホスト>:9090` に接続できます。
@@ -97,7 +99,9 @@ docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py sl
 | 引数 | 既定 | 説明 |
 |---|---|---|
 | `sim` | `false` | アームを疑似化（`servo_trajectory_bridge` が `/joint_states` を配信） |
-| `slam` | `false` | AMCL+地図の代わりに slam_toolbox で地図作成 |
+| `slam` | `false` | 起動時のモード。`true` で slam_toolbox（地図作成）、`false` で map_server＋AMCL（`map` の地図でナビ）。起動後は Navigation タブで切り替え可 |
+| `map` | プレースホルダ | 起動時にナビで使う地図（yaml のパス、または保存済み地図の名前） |
+| `maps_dir` | `$SMABO_MAPS_DIR` → `~/smabo-maps` | 地図の保存先（Docker ではホストの `~/smabo-maps` をマウント） |
 | `use_nav` / `use_moveit` / `use_vision` / `use_speech` / `use_rosbridge` | `true` | 各サブシステムの起動可否 |
 | `rosbridge_port` | `9090` | rosbridge のポート |
 | `arm` / `hand` / `breadboard` | `true` / `false` / `false` | ロボットの構成（URDF・SRDF の xacro 引数） |
@@ -170,12 +174,41 @@ ros2 launch smabo_brain_ros vision.launch.py mode:=aruco   # 画像処理一式
 `odom_node` のパラメータは従来どおり（`wheel_separation`・`odom_frame`/`base_frame`・
 `publish_tf`・`input_topic`/`output_topic`・共分散対角）。入力は `smabo_interfaces/msg/WheelVel`。
 
+## 地図作成からナビゲーションまで
+
+Nav2 のナビゲーションサーバ（planner / controller / bt_navigator）は常時起動し、
+`map` フレームと `/map` を出す部分だけを `nav_manager` ノードが子プロセスとして切り替えます。
+
+| モード | 起動するもの | `map → odom` / `/map` |
+|---|---|---|
+| `mapping` | slam_toolbox（online async） | SLAM が生成 |
+| `navigation` | nav2_bringup `localization_launch.py`（map_server＋AMCL） | 保存済み地図と AMCL |
+| `off` | なし | なし（`/odom` のみで手動走行） |
+
+smabo-web の Navigation タブ「Map」から次の順に操作します。
+
+1. **Start SLAM** → Drive タブなどでロボットを走らせて地図を作る（3D ビューに `/map` が育つ）
+2. 名前を付けて **Save** → `maps_dir/<名前>.yaml` と `.pgm`（`nav2_map_server map_saver_cli`）
+3. 保存済み地図を選んで **Use** → map_server＋AMCL に切り替え。直前まで SLAM で作っていた地図なら、
+   SLAM 上のロボット位置を `/initialpose` として AMCL に引き継ぐので、そのままゴールを指定できます
+   （それ以外は Initial Pose で位置を合わせてから）
+
+プロトコル（rosbridge 経由。smabo-brain 側では ROS 専用トピックとして転送しません）:
+
+| トピック | 型 | 内容 |
+|---|---|---|
+| `/web/nav/command` → `/nav/command` | `std_msgs/String`（JSON） | `{"op": "mapping"}` / `{"op": "save", "name": "room_1"}` / `{"op": "navigate", "name": "room_1"}` / `{"op": "stop"}` |
+| `/nav/state` | `std_msgs/String`（JSON, transient local, 1 秒ごと） | `{mode, map, maps: [{name, saved, resolution}], busy, message, maps_dir}` |
+
+地図名は英数字と `_ . -`（64 文字まで）。Docker では `docker-compose.yml` がホストの `~/smabo-maps` を
+`/opt/smabo_maps`（`SMABO_MAPS_DIR`）にマウントするので、コンテナを作り直しても地図は残ります。
+
 ## smabo-web からの操作（3D ビューア）
 
 smabo-web に **Navigation**・**Motion Plan** タブを追加しました（roslibjs＋ros3djs）。
 
 - **Navigation**: `/map`・`/scan`・ロボット URDF を 3D 表示し、`/initialpose` の設定と
-  `navigate_to_pose` アクションによる目標指定（Nav2 の RViz 相当）。
+  `navigate_to_pose` アクションによる目標指定（Nav2 の RViz 相当）。SLAM → 地図保存 → 保存地図でナビの切り替え。
 - **Motion Plan**: MoveIt の MotionPlanning パネル相当。URDF・SRDF・メッシュを
   `robot_model_server`（`/smabo/get_file`）から rosbridge 経由で取得して three.js で描画し、
   現在の姿勢（`/joint_states`）・目標姿勢（半透明）・計画した軌道（アニメーション）を表示。

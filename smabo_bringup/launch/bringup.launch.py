@@ -5,7 +5,10 @@ Composes, in one place:
   - odom_node (smabo_brain_ros)                       → /wheel_vel -> /odom + tf
   - prefix relays (smabo_brain_ros)                   → /web,/esp32,/app -> canonical
   - rosbridge_suite                                   → WS<->ROS2 for web/app/esp32
-  - Nav2 (+ AMCL or SLAM)                             → /odom,/scan -> /cmd_vel
+  - Nav2 navigation servers + nav_manager (smabo_brain_ros)
+                                                      → /odom,/scan -> /cmd_vel; nav_manager
+                                                        switches SLAM (build a map) / AMCL (saved
+                                                        map) at runtime from smabo-web's Nav tab
   - MoveIt2 move_group + servo_trajectory_bridge      → arm planning -> /servo/command
   - robot_model_server (smabo_brain_ros)              → URDF / SRDF / meshes for smabo-web (/smabo/get_file)
   - vision (webrtc_camera + image_processor + policies)→ WebRTC video -> detections -> behaviours
@@ -14,9 +17,14 @@ Composes, in one place:
 Arguments:
   sim          (false) simulate the arm: servo_trajectory_bridge publishes
                /joint_states from commands (no ESP32 needed for MoveIt).
-  slam         (false) build a map with slam_toolbox instead of AMCL+map.
-  map          map yaml for AMCL (default: smabo_navigation/maps/empty_map.yaml).
-               For smabo-sim use maps/sim_room.yaml (exported from its world).
+  slam         (false) start in mapping mode (slam_toolbox) instead of AMCL+map.
+               Either way, the Nav tab switches between building a map, saving
+               it and navigating on a saved one without restarting.
+  map          map to start AMCL on: a yaml path or the name of a saved map
+               (default: smabo_navigation/maps/empty_map.yaml). For smabo-sim
+               maps/sim_room.yaml is its world exported as a map.
+  maps_dir     where maps are saved / listed (default: $SMABO_MAPS_DIR, else
+               ~/smabo-maps; docker-compose mounts the host's ~/smabo-maps).
   use_nav      (true)  start Nav2.
   use_moveit   (true)  start MoveIt2 + the servo trajectory bridge.
   use_vision   (true)  start the vision pipeline (webrtc_camera ingests the
@@ -57,6 +65,7 @@ def generate_launch_description():
     navigation = get_package_share_directory("smabo_navigation")
     moveit = get_package_share_directory("smabo_moveit_config")
     bringup = get_package_share_directory("smabo_bringup")
+    nav2_params = os.path.join(navigation, "config", "nav2_params.yaml")
 
     return LaunchDescription([
         DeclareLaunchArgument("sim", default_value="false"),
@@ -69,6 +78,7 @@ def generate_launch_description():
         DeclareLaunchArgument("rosbridge_port", default_value="9090"),
         DeclareLaunchArgument(
             "map", default_value=os.path.join(navigation, "maps", "empty_map.yaml")),
+        DeclareLaunchArgument("maps_dir", default_value=""),
         DeclareLaunchArgument("arm", default_value="true"),
         DeclareLaunchArgument("hand", default_value="false"),
         DeclareLaunchArgument("breadboard", default_value="false"),
@@ -105,25 +115,30 @@ def generate_launch_description():
             condition=IfCondition(use_rosbridge),
         ),
 
-        # --- Nav2: AMCL+map (default) ---
+        # --- Nav2 navigation servers (always) + nav_manager, which runs either
+        #     slam_toolbox (mapping) or map_server+AMCL (navigation) and switches
+        #     between them on request from smabo-web ---
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(navigation, "launch", "nav2.launch.py")
+                os.path.join(get_package_share_directory("nav2_bringup"), "launch",
+                             "navigation_launch.py")
             ),
-            launch_arguments={"map": LaunchConfiguration("map")}.items(),
-            condition=IfCondition(PythonExpression(
-                ["'", use_nav, "' == 'true' and '", slam, "' == 'false'"]
-            )),
+            launch_arguments={"params_file": nav2_params, "autostart": "true"}.items(),
+            condition=IfCondition(use_nav),
         ),
-
-        # --- Nav2: SLAM (slam:=true) ---
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(navigation, "launch", "slam.launch.py")
-            ),
-            condition=IfCondition(PythonExpression(
-                ["'", use_nav, "' == 'true' and '", slam, "' == 'true'"]
-            )),
+        Node(
+            package="smabo_brain_ros",
+            executable="nav_manager",
+            name="nav_manager",
+            output="screen",
+            parameters=[{
+                "initial_mode": PythonExpression(["'mapping' if '", slam, "' == 'true' else 'navigation'"]),
+                "initial_map": LaunchConfiguration("map"),
+                "maps_dir": LaunchConfiguration("maps_dir"),
+                "nav2_params": nav2_params,
+                "slam_params": os.path.join(navigation, "config", "slam_toolbox.yaml"),
+            }],
+            condition=IfCondition(use_nav),
         ),
 
         # --- MoveIt2 move_group ---

@@ -33,6 +33,7 @@ setup(
             "neck_policy_node = smabo_brain_ros.neck_policy_node:main",
             "drive_policy_node = smabo_brain_ros.drive_policy_node:main",
             "robot_model_server = smabo_brain_ros.robot_model_server:main",
+            "nav_manager = smabo_brain_ros.nav_manager:main",
         ],
     },
 )
