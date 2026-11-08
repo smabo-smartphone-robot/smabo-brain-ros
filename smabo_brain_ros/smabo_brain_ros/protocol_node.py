@@ -17,7 +17,7 @@ from std_msgs.msg import String
 from brain.topics import PROTOCOL_VERSION
 
 BRAIN_NAME = "smabo-brain-ros"
-BRAIN_VERSION = "0.1.0"   # keep in step with setup.py / package.xml
+BRAIN_VERSION = "0.2.0"   # keep in step with setup.py / package.xml
 INFO_PERIOD_S = 5.0
 
 

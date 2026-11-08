@@ -261,3 +261,8 @@ cd ../smabo-web && npm install && npm run dev   # Navigation / Motion Plan タ�
 - ESP32 側（smabo-esp32）は `brain.rosbridge:true` で rosbridge に接続し、接続時に
   送信トピックを advertise・受信トピックを subscribe します。`/scan` は LD06 を UART 直結し
   `modes.lidar` で配信（`lidar_ld06.py`）。詳細は smabo-esp32 の README を参照。
+
+## バージョンと互換性
+
+ほかの smabo リポジトリとは、同じ minor 番号（`0.2.x` など）どうしで組み合わせます。対応表は
+[smabo-brain の README](https://github.com/smabo-smartphone-robot/smabo-brain#バージョンと互換性) にあります。

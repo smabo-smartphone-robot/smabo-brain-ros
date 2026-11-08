@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>smabo_interfaces</name>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <description>Custom messages and services for smabo (raw wheel velocities, robot-model files, etc.).</description>
   <maintainer email="daigaku.robot@gmail.com">smabo</maintainer>
   <license>MIT</license>
