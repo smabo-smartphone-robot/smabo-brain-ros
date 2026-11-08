@@ -160,6 +160,15 @@ def generate_launch_description():
             condition=IfCondition(use_moveit),
         ),
 
+        # --- protocol check (/brain/info for clients, /hello from them) ---
+        Node(
+            package="smabo_brain_ros",
+            executable="protocol_node",
+            name="protocol_node",
+            output="screen",
+            condition=IfCondition(use_rosbridge),
+        ),
+
         # --- robot model server (URDF / SRDF / meshes over rosbridge for smabo-web) ---
         Node(
             package="smabo_brain_ros",
