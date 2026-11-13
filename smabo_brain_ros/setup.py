@@ -35,6 +35,7 @@ setup(
             "robot_model_server = smabo_brain_ros.robot_model_server:main",
             "nav_manager = smabo_brain_ros.nav_manager:main",
             "protocol_node = smabo_brain_ros.protocol_node:main",
+            "restamp_relay = smabo_brain_ros.restamp_relay:main",
         ],
     },
 )
