@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Building needs ROS 2; these checks catch broken files without it.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Python and launch files compile
+        run: python -m compileall -q .
+      - name: package.xml and URDF are well-formed XML
+        run: |
+          sudo apt-get install -y -qq libxml2-utils > /dev/null
+          find . -name package.xml -o -name '*.urdf' -o -name '*.xacro' | xargs -r xmllint --noout
+      - name: Shell scripts parse
+        run: for f in $(git ls-files '*.sh'); do bash -n "$f"; done

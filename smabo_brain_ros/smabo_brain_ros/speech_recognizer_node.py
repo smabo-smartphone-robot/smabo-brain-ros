@@ -87,8 +87,9 @@ class SpeechRecognizerNode(Node):
                 self.get_logger().error("STT failed", throttle_duration_sec=5.0)
                 continue
             if text:
-                self.get_logger().info("STT: %r", text)
                 self._pub.publish(String(data=text))
+                # rclpy's logger takes one preformatted string (no %-args)
+                self.get_logger().info(f"STT: {text!r}")
 
     def destroy_node(self) -> bool:
         self._running = False

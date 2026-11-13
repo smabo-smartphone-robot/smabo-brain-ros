@@ -1,0 +1,8 @@
+# Fetch a robot-model resource over rosbridge (served by smabo_brain_ros/robot_model_server).
+#   uri: "robot_description" | "robot_description_semantic" | "package://<pkg>/<path>"
+#        (package:// is limited to mesh files under the package's share directory)
+string uri
+---
+bool success
+string message
+uint8[] data    # file contents (rosbridge sends uint8[] as a base64 string)

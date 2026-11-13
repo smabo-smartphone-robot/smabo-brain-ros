@@ -1,7 +1,7 @@
 """rosbridge_suite — the single WS<->ROS2 boundary for smabo.
 
 smabo-web / smabo-app / smabo-esp32 connect here over WebSocket (default :9090,
-the same port the legacy smabo-brain relay used, so it is a drop-in). rosapi is
+the same port smabo-brain uses, so clients need no change). rosapi is
 included so the web client can query topics/services for the 3D viewer.
 """
 
@@ -33,6 +33,11 @@ def generate_launch_description():
                 # smabo clients publish/subscribe in rosbridge v2 JSON.
                 "call_services_in_new_thread": True,
                 "send_action_goals_in_new_thread": True,
+                # The node's own default is 1 MB; larger messages are split into
+                # "fragment" ops, which roslibjs cannot reassemble. Meshes served by
+                # /smabo/get_file (base_link.stl ≈ 1 MB → ~1.4 MB base64) exceed it.
+                # 10 MB matches rosbridge's official launch file default.
+                "max_message_size": 10000000,
             }],
         ),
         Node(

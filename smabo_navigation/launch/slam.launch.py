@@ -1,8 +1,8 @@
 """SLAM (slam_toolbox) + Nav2, for building a map while driving smabo.
 
 slam_toolbox publishes map -> odom from the LD06 /scan; Nav2 navigation servers
-plan/control on top. Save the map with the /slam_toolbox/save_map service, then
-switch to nav2.launch.py (AMCL) for repeated runs.
+plan/control on top. Standalone alternative to bringup, whose nav_manager does
+the same and also saves maps and switches to AMCL from smabo-web's Nav tab.
 """
 
 import os

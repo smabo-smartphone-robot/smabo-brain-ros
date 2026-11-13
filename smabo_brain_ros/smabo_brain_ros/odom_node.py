@@ -7,7 +7,7 @@ Subscribes to raw wheel velocities (``smabo_interfaces/WheelVel``) and publishes
 
 The pure core returns plain pose/twist values; this node supplies ROS time and
 builds the ROS messages / tf.  The WebSocket transport in smabo-brain does the
-same with wall-clock time (see ``brain/relay.py``) — that separation is what
+same with wall-clock time (see ``brain/frames.py``) — that separation is what
 lets brain-ros wrap brain by simply importing its core.
 """
 

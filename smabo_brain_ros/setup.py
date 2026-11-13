@@ -7,7 +7,7 @@ package_name = "smabo_brain_ros"
 
 setup(
     name=package_name,
-    version="0.1.0",
+    version="0.2.0",
     packages=find_packages(exclude=["test"]),
     data_files=[
         ("share/ament_index/resource_index/packages",
@@ -32,6 +32,10 @@ setup(
             "gaze_policy_node = smabo_brain_ros.gaze_policy_node:main",
             "neck_policy_node = smabo_brain_ros.neck_policy_node:main",
             "drive_policy_node = smabo_brain_ros.drive_policy_node:main",
+            "robot_model_server = smabo_brain_ros.robot_model_server:main",
+            "nav_manager = smabo_brain_ros.nav_manager:main",
+            "protocol_node = smabo_brain_ros.protocol_node:main",
+            "restamp_relay = smabo_brain_ros.restamp_relay:main",
         ],
     },
 )

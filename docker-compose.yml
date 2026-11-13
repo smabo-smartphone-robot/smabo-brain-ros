@@ -17,9 +17,17 @@ services:
       - ROS_DOMAIN_ID=0
       - SMABO_WS=/opt/smabo_ws
       - SMABO_BRAIN_DIR=/opt/smabo-brain
+      # WebRTC: try ICE paths on this network first. 192.168.64.0/24 is Docker
+      # Desktop's (macOS) direct VM<->Mac link; without it ICE tends to pick a
+      # path through Docker's NAT that drops after ~30 s. Harmless elsewhere
+      # (other interfaces stay as fallbacks). Empty = no preference.
+      - SMABO_ICE_PREFER=${SMABO_ICE_PREFER-192.168.64.0/24}
+      # maps saved from smabo-web's Nav tab (nav_manager) — kept on the host
+      - SMABO_MAPS_DIR=/opt/smabo_maps
     volumes:
       - ./:/opt/smabo_ws/src/smabo-brain-ros:rw
       - ../smabo-brain:/opt/smabo-brain:rw
+      - ${HOME}/smabo-maps:/opt/smabo_maps:rw
     # default CMD launches bringup; override for sim/slam, e.g.:
     #   docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py sim:=true
     stdin_open: true

@@ -17,6 +17,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -60,7 +61,7 @@ def generate_launch_description():
             output="screen",
             parameters=[{
                 "enabled": True,
-                "mode": mode,
+                "mode": ParameterValue(mode, value_type=str),  # "off" would parse as YAML bool
                 "color": color,
                 "hfov_deg": hfov_deg,
                 "input_topic": "camera/image_raw",

@@ -1,6 +1,7 @@
 # slam_toolbox (online async) for building a map from the LD06 /scan while
-# driving smabo around. Publishes map -> odom; save the result with the
-# slam_toolbox /slam_toolbox/save_map service, then switch to AMCL + map_server.
+# driving smabo around. Publishes map -> odom. smabo_brain_ros/nav_manager runs
+# it in "mapping" mode and saves the map (map_saver) when asked from smabo-web's
+# Nav tab, then switches to AMCL + map_server on the saved map.
 slam_toolbox:
   ros__parameters:
     use_sim_time: false
