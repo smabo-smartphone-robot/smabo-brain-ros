@@ -50,6 +50,11 @@ class RestampRelay(Node):
     def _forward(self, pub):
         def cb(msg) -> None:
             msg.header.stamp = self.get_clock().now().to_msg()
+            if isinstance(msg, LaserScan):
+                # The stamp is now the arrival time (after the turn), not the
+                # first ray's time, so per-ray times would be wrong: Cartographer
+                # would "de-skew" the scan with them and bend it while turning.
+                msg.time_increment = 0.0
             pub.publish(msg)
         return cb
 
