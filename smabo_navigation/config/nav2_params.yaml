@@ -36,7 +36,10 @@ bt_navigator:
     robot_base_frame: base_link
     odom_topic: /odom
     bt_loop_duration: 10
-    default_server_timeout: 20
+    # ms to wait for a Nav2 server to acknowledge each request. The stock 20 ms
+    # is too short on a slow host (an emulated amd64 image on Apple silicon, a
+    # Raspberry Pi): every request timed out and goals aborted at once.
+    default_server_timeout: 200
 
 controller_server:
   ros__parameters:
@@ -58,7 +61,16 @@ controller_server:
       yaw_goal_tolerance: 0.15
       stateful: true
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
+      # Rotation shim: when the path starts off to the side or behind (a goal in
+      # the opposite direction), turn in place toward it first, then hand over
+      # to DWB. DWB alone turns while driving and swings wide off the path.
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      primary_controller: "dwb_core::DWBLocalPlanner"
+      angular_dist_threshold: 0.785       # rad: rotate first when the path is > 45 deg off
+      forward_sampling_distance: 0.3      # m along the path to take its heading from
+      rotate_to_heading_angular_vel: 0.8  # rad/s (the wheel speed control tracks this)
+      max_angular_accel: 2.0
+      simulate_ahead_time: 1.0            # collision check of the in-place turn
       min_vel_x: 0.0
       max_vel_x: 0.30
       min_vel_theta: 0.0

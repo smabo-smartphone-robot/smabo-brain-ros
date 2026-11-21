@@ -6,8 +6,10 @@
     arm:=true|false         3-DOF arm + gripper on top      (smabo_arm.xacro)
     hand:=true|false        a hand on each side             (smabo_hand.xacro)
     breadboard:=true|false  rear breadboard / PCA9685 mounts (smabo_base.xacro)
-    mount:=none|tt_motor|neck
+    mount:=none|tt_motor|dg01d_e|neck
         tt_motor : mobile chassis with TT motors underneath (smabo_tt_motor.xacro)
+        dg01d_e  : mobile chassis with DG01D-E motors (encoders) underneath and
+                   the LD19 lidar on top (smabo_dg01d_e.xacro)
         neck     : floor-standing pan stand that turns the base (smabo_neck.xacro)
 
   e.g.  xacro smabo.urdf.xacro arm:=false hand:=true breadboard:=true mount:=neck
@@ -18,10 +20,11 @@
     left/right_wheel_joint (dc.wheel_radius = 0.030 m)
 
   Frames: base_link is the URDF root (with mount:=neck the root is
-  pan_stand_link on the floor). With mount:=tt_motor, odom -> base_link is
-  published by smabo_brain_ros/odom_node, so there is deliberately no
-  base_footprint parent (base_link would get two TF parents). The lidar frame is
-  named `laser` to match the /scan header arriving over rosbridge.
+  pan_stand_link on the floor). With mount:=tt_motor / dg01d_e, odom -> base_link
+  is published by smabo_brain_ros/odom_node, so there is deliberately no
+  base_footprint parent (base_link would get two TF parents). The lidar frame
+  (mount:=dg01d_e) is named `laser` to match the /scan header arriving over
+  rosbridge.
 -->
 <robot name="smabo" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
@@ -34,6 +37,7 @@
   <xacro:include filename="$(find smabo_description)/urdf/smabo_arm.xacro"/>
   <xacro:include filename="$(find smabo_description)/urdf/smabo_hand.xacro"/>
   <xacro:include filename="$(find smabo_description)/urdf/smabo_tt_motor.xacro"/>
+  <xacro:include filename="$(find smabo_description)/urdf/smabo_dg01d_e.xacro"/>
   <xacro:include filename="$(find smabo_description)/urdf/smabo_neck.xacro"/>
 
   <xacro:smabo_base/>
@@ -50,13 +54,9 @@
 
   <xacro:if value="${'$(arg mount)' == 'tt_motor'}">
     <xacro:smabo_tt_motor/>
-    <!-- LD06 lidar: TF frame only, placed on top of the base until its mount is in the CAD -->
-    <link name="laser"/>
-    <joint name="laser_joint" type="fixed">
-      <parent link="base_link"/>
-      <child  link="laser"/>
-      <origin xyz="0 0 0.115" rpy="0 0 0"/>
-    </joint>
+  </xacro:if>
+  <xacro:if value="${'$(arg mount)' == 'dg01d_e'}">
+    <xacro:smabo_dg01d_e/>
   </xacro:if>
   <xacro:if value="${'$(arg mount)' == 'neck'}">
     <xacro:smabo_neck/>

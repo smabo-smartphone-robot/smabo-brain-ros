@@ -34,8 +34,9 @@ smabo-web / smabo-app / smabo-esp32
         ├─ relays              /web,/esp32,/app prefix を canonical 名へ
         ├─ odom_node           /wheel_vel → /odom (+tf)   ← brain.odometry を再利用
         ├─ speech_recognizer   /speech/audio → STT → /speech/recognized  ← brain.stt を再利用
-        ├─ Nav2                /odom + /scan → /cmd_vel
-        └─ MoveIt2             arm 計画 → servo_trajectory_bridge → /servo/command
+        └─ mode_manager        smabo-web の指示で次のどちらか一方を起動・停止（URDF も切り替え）
+             ├─ nav   Nav2              /odom + /scan → /cmd_vel
+             └─ plan  MoveIt2           arm 計画 → servo_trajectory_bridge → /servo/command
 
   smabo-app ══[WebRTC 映像, P2P]══> webrtc_camera_node ──[/camera/image_raw]──> image_processor → /vision/detections
         （シグナリング /webrtc/* のみ rosbridge 経由）
@@ -76,20 +77,26 @@ ROS 2 Humble・Nav2・MoveIt2・rosbridge を含む環境を Docker で用意し
 ```bash
 cd ~/github/smabo-repos/smabo-brain-ros
 docker compose build
-docker compose up           # 既定で bringup.launch.py を起動
+docker compose up           # 既定で bringup.launch.py（ベースのみ）を起動
 ```
+
+`docker compose up` で起動するのはベース（rosbridge・relays・robot_state_publisher・odom・
+robot_model_server・vision・speech・mode_manager）だけです。ナビゲーション（Nav2）と動作計画
+（MoveIt2）は、smabo-web の Navigation / Motion Plan タブの「Start …」ボタンで起動します
+（下記「モード（ナビゲーション / 動作計画）」）。
 
 別の構成で起動する場合:
 
 ```bash
-# sim（実機なし。MoveIt 用に servo_trajectory_bridge が /joint_states を疑似配信）
-docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py sim:=true
+# 動作計画モードを sim で起動（実機なし。servo_trajectory_bridge が /joint_states を疑似配信）
+docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py mode:=plan sim:=true
 
-# SLAM（地図作成）モードで起動
-docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py slam:=true
+# ナビゲーションモードを SLAM（地図作成）で起動
+docker compose run --rm smabo-ros ros2 launch smabo_bringup bringup.launch.py mode:=nav slam:=true
 ```
 
 SLAM ↔ ナビの切り替えは再起動不要で、smabo-web の Navigation タブから行えます（下記「地図作成からナビゲーションまで」）。
+`mode_manager` などノードを追加・更新した後は `docker compose build` でイメージを作り直してください。
 
 ホストネットワークで `:9090` を公開するので、smabo-web / ESP32 から
 `ws://<このホスト>:9090` に接続できます。
@@ -98,14 +105,15 @@ SLAM ↔ ナビの切り替えは再起動不要で、smabo-web の Navigation �
 
 | 引数 | 既定 | 説明 |
 |---|---|---|
-| `sim` | `false` | アームを疑似化（`servo_trajectory_bridge` が `/joint_states` を配信） |
-| `slam` | `false` | 起動時のモード。`true` で slam_toolbox（地図作成）、`false` で map_server＋AMCL（`map` の地図でナビ）。起動後は Navigation タブで切り替え可 |
-| `map` | プレースホルダ | 起動時にナビで使う地図（yaml のパス、または保存済み地図の名前） |
+| `mode` | `none` | 起動直後に始めるモード（`none` / `nav` / `plan`）。起動後は smabo-web から開始・停止・切り替え可 |
+| `sim` | `false` | 動作計画モードでアームを疑似化（`servo_trajectory_bridge` が `/joint_states` を配信） |
+| `slam` | `false` | ナビゲーションモード開始時の状態。`true` で SLAM（Cartographer で地図作成）、`false` で map_server＋AMCL（`map` の地図でナビ。`map` が空なら地図作成で開始）。起動後は Navigation タブで切り替え可 |
+| `map` | （空） | 起動時にナビで使う地図（yaml のパス、または保存済み地図の名前）。空ならナビゲーションモードは SLAM（地図作成）で始まります |
 | `maps_dir` | `$SMABO_MAPS_DIR` → `~/smabo-maps` | 地図の保存先（Docker ではホストの `~/smabo-maps` をマウント） |
-| `use_nav` / `use_moveit` / `use_vision` / `use_speech` / `use_rosbridge` | `true` | 各サブシステムの起動可否 |
+| `use_vision` / `use_speech` / `use_rosbridge` | `true` | 各サブシステムの起動可否 |
 | `rosbridge_port` | `9090` | rosbridge のポート |
-| `arm` / `hand` / `breadboard` | `true` / `false` / `false` | ロボットの構成（URDF・SRDF の xacro 引数） |
-| `mount` | `none` | `none` / `tt_motor`（移動台車） / `neck`（床置きのパン台） |
+| `arm` / `hand` / `breadboard` | `true` / `false` / `false` | モードが動いていない間のロボットの構成（URDF の xacro 引数）。各モードは開始時に自分の構成へ切り替えます |
+| `mount` | `none` | `none` / `tt_motor`（移動台車） / `dg01d_e`（エンコーダ付き移動台車＋LD19） / `neck`（床置きのパン台） |
 
 ## ロボットモデル
 
@@ -122,10 +130,11 @@ xacro smabo.urdf.xacro arm:=false hand:=true breadboard:=true mount:=neck
 | breadboard | `smabo_base.xacro` | `breadboard_link`（fixed） |
 | arm | `smabo_arm.xacro` | `arm_base_link` → `arm_joint_1`〜`3` → `arm_tool0`、グリッパ `arm_joint_4`（−90° 閉〜＋90° 開） |
 | hand | `smabo_hand.xacro` | `hand_mount_link`、`left_hand` / `right_hand`（＋で前へ上がる） |
-| tt_motor | `smabo_tt_motor.xacro` | `chassis_link`、`left/right_wheel_joint`（半径 0.030 m、間隔 0.130 m）、`laser`（仮） |
+| tt_motor | `smabo_tt_motor.xacro` | `chassis_link`、`left/right_wheel_joint`（半径 0.030 m、間隔 0.130 m） |
+| dg01d_e | `smabo_dg01d_e.xacro` | `chassis_link`、`left/right_wheel_joint`（半径 0.030 m、間隔 0.128 m）、`lidar_mount_link`、`laser`（LD19 のスキャン面、`base_link` の上 0.1333 m） |
 | neck | `smabo_neck.xacro` | `pan_stand_link`（根）→ `head_pan` → `pan_link` → `base_link` |
 
-SG90・MG996R・TT モータ・車輪・キャスターは STEP に無いため、簡易形状でメッシュに含めています。
+SG90・MG996R・TT モータ・DG01D-E・車輪・キャスター・LD19 は STEP に無いため、簡易形状でメッシュに含めています。
 メッシュの再生成は `python3 smabo_description/scripts/split_smabo_meshes.py smabo_description/meshes`。
 
 ## ローカル（ネイティブ ROS 2）で起動
@@ -138,7 +147,7 @@ ROS 2 Humble がインストール済みなら、付属スクリプトで odom �
 source ~/smabo_ws/install/setup.bash
 export PYTHONPATH="$HOME/github/smabo-repos/smabo-brain:$PYTHONPATH"  # brain を import 可能に
 
-ros2 launch smabo_bringup bringup.launch.py            # フル
+ros2 launch smabo_bringup bringup.launch.py            # ベース（nav / plan は smabo-web から起動）
 ros2 launch smabo_brain_ros odom.launch.py             # odom 単体（従来）
 ros2 launch smabo_brain_ros vision.launch.py mode:=aruco   # 画像処理一式
 ```
@@ -174,16 +183,42 @@ ros2 launch smabo_brain_ros vision.launch.py mode:=aruco   # 画像処理一式
 `odom_node` のパラメータは従来どおり（`wheel_separation`・`odom_frame`/`base_frame`・
 `publish_tf`・`input_topic`/`output_topic`・共分散対角）。入力は `smabo_interfaces/msg/WheelVel`。
 
+## モード（ナビゲーション / 動作計画）
+
+ナビゲーションと動作計画は使うロボットの構成が違うため、`mode_manager` がどちらか一方だけを
+子プロセス（`ros2 launch`）として起動します。開始時には robot_state_publisher の
+`robot_description` を実行中に差し替え（`/robot_description` が更新され、smabo-web の 3D 表示も
+作り直されます）、その後スタックを起動します。別のモードを開始すると、動いている方を止めてから切り替えます。
+
+| モード | launch | 起動するもの | ロボットの構成（xacro 引数） |
+|---|---|---|---|
+| `nav` | `nav.launch.py` | Nav2（`navigation_launch.py`）＋ `nav_manager` | `mount:=dg01d_e arm:=false breadboard:=true hand:=false` |
+| `plan` | `plan.launch.py` | MoveIt2 `move_group` ＋ `servo_trajectory_bridge` | `arm:=true hand:=false breadboard:=false mount:=none` |
+
+| トピック | 型 | 内容 |
+|---|---|---|
+| `/web/mode/command` → `/mode/command` | `std_msgs/String`（JSON） | `{"op": "start", "mode": "nav"}` / `{"op": "start", "mode": "plan"}` / `{"op": "stop"}` |
+| `/mode/state` | `std_msgs/String`（JSON, transient local, 1 秒ごと） | `{mode, status, message, model}`（`status`: `stopped` / `starting` / `running` / `stopping` / `error`） |
+
+smabo-web の Navigation / Motion Plan タブには、いま動いているモード（Navigation / Motion Plan / なし）と
+「Start …」「Stop」ボタンが表示されます。
+
 ## 地図作成からナビゲーションまで
 
-Nav2 のナビゲーションサーバ（planner / controller / bt_navigator）は常時起動し、
+ナビゲーションモードでは、Nav2 のナビゲーションサーバ（planner / controller / bt_navigator）は常時起動し、
 `map` フレームと `/map` を出す部分だけを `nav_manager` ノードが子プロセスとして切り替えます。
 
 | モード | 起動するもの | `map → odom` / `/map` |
 |---|---|---|
-| `mapping` | slam_toolbox（online async） | SLAM が生成 |
+| `mapping` | Cartographer（`smabo_navigation` の `cartographer.launch.py`。設定は `config/cartographer_2d.lua`） | SLAM が生成 |
 | `navigation` | nav2_bringup `localization_launch.py`（map_server＋AMCL） | 保存済み地図と AMCL |
 | `off` | なし | なし（`/odom` のみで手動走行） |
+
+SLAM は Cartographer を使います。slam_toolbox（Humble）は、ロボットが一定距離（`minimum_travel_distance`）
+進むまでスキャンを取り込まないので、その場回転の向きを車輪オドメトリだけで決めてしまいます。
+回転中にずれた向きを、次に進んだときのスキャン照合（±20° ほど）で直しきれないと地図が崩れます。
+Cartographer はスキャンごと（向きが 1° 変わるごと）に照合するので、その場回転も LiDAR で追従します。
+slam_toolbox に戻すときは `nav.launch.py` の `slam_backend:=slam_toolbox` です。
 
 smabo-web の Navigation タブ「Map」から次の順に操作します。
 
@@ -205,10 +240,12 @@ smabo-web の Navigation タブ「Map」から次の順に操作します。
 
 ## smabo-web からの操作（3D ビューア）
 
-smabo-web に **Navigation**・**Motion Plan** タブを追加しました（roslibjs＋ros3djs）。
+smabo-web に **Navigation**・**Motion Plan** タブを追加しました（roslibjs＋three.js）。
 
-- **Navigation**: `/map`・`/scan`・ロボット URDF を 3D 表示し、`/initialpose` の設定と
-  `navigate_to_pose` アクションによる目標指定（Nav2 の RViz 相当）。SLAM → 地図保存 → 保存地図でナビの切り替え。
+- **Navigation**: Nav2 の RViz 表示に相当。真上からの 2D 表示（3D に切り替え可）に、地図・global / local
+  コストマップ・`/plan`・`/local_plan`・footprint・AMCL のパーティクル・`/scan`・ロボット URDF を重ねて描画し、
+  「2D Pose Estimate」（`/initialpose`）・「Nav2 Goal」（`navigate_to_pose` アクション）は地図上をクリック＆ドラッグで
+  指定します（数値入力も可）。SLAM → 地図保存 → 保存地図でナビの切り替え。
 - **Motion Plan**: MoveIt の MotionPlanning パネル相当。URDF・SRDF・メッシュを
   `robot_model_server`（`/smabo/get_file`）から rosbridge 経由で取得して three.js で描画し、
   現在の姿勢（`/joint_states`）・目標姿勢（半透明）・計画した軌道（アニメーション）を表示。
@@ -219,22 +256,18 @@ smabo-web に **Navigation**・**Motion Plan** タブを追加しました（ros
 ヘッダの brain ホスト（既定 `smabo-brain.local:9090`）に rosbridge のアドレスを入れて、
 各タブの「Connect ROS」で接続します。
 
-> **TF と tf2_web_republisher**: ros3djs の `TFClient` は `tf2_web_republisher` を前提とします。
-> 3D ビューでロボット・スキャンを正しい位置に描画するには ROS 側でこれを起動してください
-> （Humble ではディストリにより別途導入が必要な場合があります）。未導入でもグリッド・地図・
-> ロボットは原点基準で表示されます。
->
-> **ros3djs ↔ three のバージョン整合**は既知の注意点です（`package.json` でピン留め）。
+> **TF**: Navigation の表示は `/tf`・`/tf_static` を rosbridge で直接購読して配置するため、
+> `tf2_web_republisher` は不要です。
 
 ## 動作確認
 
 ```bash
 # 1) ノード・トピックが上がっているか
-ros2 node list      # rosbridge_websocket, odom, move_group, nav2 各種, servo_trajectory_bridge
+ros2 node list      # rosbridge_websocket, odom, mode_manager（＋ nav: nav2 各種 / plan: move_group, servo_trajectory_bridge）
 ros2 topic list     # /odom, /scan, /cmd_vel, /joint_states, /map ...
 
 # 2) sim で odom/costmap（別端末でダミー入力）
-ros2 launch smabo_bringup bringup.launch.py sim:=true
+ros2 launch smabo_bringup bringup.launch.py mode:=plan sim:=true
 ros2 topic pub -r 20 /esp32/wheel_vel smabo_interfaces/msg/WheelVel \
   '{left: 0.1, right: 0.1, dt: 0.05}'      # → /odom が動く
 ros2 topic echo /odom

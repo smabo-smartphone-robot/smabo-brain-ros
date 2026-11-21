@@ -5,7 +5,7 @@
   scripts/split_smabo_meshes.py.
 
   Links (STEP parts):
-    chassis_link     : tt_motor_bottom, tt_motor_stopper1/2, dc_motor_caster
+    chassis_link     : tt_motor_bottom, tt_motor_stopper1, tt_motor_stopper2_LR, dc_motor_caster
                        + both TT motors (simplified, SunFounder drawing)
                        + ball caster (simplified, height set so the base stands level)
     left/right_wheel_link : wheel (simplified, radius from smabo-esp32 config)

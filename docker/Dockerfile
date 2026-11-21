@@ -1,18 +1,26 @@
 # smabo-brain-ros ROS 2 environment: rosbridge + Nav2 + MoveIt2 + the smabo
 # workspace, with smabo-brain importable so the ROS nodes can reuse brain's
 # pure logic (odometry, topic prefixes).
-FROM osrf/ros:humble-desktop
+#
+# ros:humble (ros-base) is published for amd64 and arm64, so on an Apple Silicon
+# Mac / Raspberry Pi the stack runs natively. (osrf/ros:humble-desktop is amd64
+# only: under emulation Nav2 + rosbridge could not keep up and the whole graph
+# stalled for seconds at a time.) Nothing here needs the desktop GUI tools.
+FROM ros:humble
 
 SHELL ["/bin/bash", "-c"]
 
 # --- ROS dependencies (Nav2, MoveIt2, rosbridge, SLAM, model tooling) ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-pip \
+      python3-opencv \
+      python3-numpy \
       ros-humble-rosbridge-suite \
       ros-humble-rosapi \
       ros-humble-navigation2 \
       ros-humble-nav2-bringup \
       ros-humble-slam-toolbox \
+      ros-humble-cartographer-ros \
       ros-humble-moveit \
       ros-humble-robot-state-publisher \
       ros-humble-joint-state-publisher \
@@ -22,13 +30,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-audio-common-msgs \
       ros-humble-vision-msgs \
     && rm -rf /var/lib/apt/lists/*
-
-# tf2_web_republisher feeds TF to the ros3djs viewer in smabo-web. It may not be
-# packaged for every Humble mirror, so install it best-effort (the 3D view still
-# renders grid/map/robot at origin without it — see README).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ros-humble-tf2-web-republisher \
-    ; rm -rf /var/lib/apt/lists/* || true
 
 # aiortc: webrtc_camera_node terminates smabo-app's WebRTC video as a peer and
 # republishes frames as native sensor_msgs/Image (camera bypasses rosbridge for

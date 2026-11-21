@@ -1,5 +1,5 @@
 # Placeholder 10 m x 10 m empty map (all free) so Nav2 + AMCL can start before
-# a real map is built. Replace with a slam_toolbox-saved map for real use.
+# a real map is built. Build and save a real one from smabo-web's Navigation tab.
 image: empty_map.pgm
 mode: trinary
 resolution: 0.05

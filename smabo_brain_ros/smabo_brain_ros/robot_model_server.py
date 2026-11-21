@@ -6,6 +6,9 @@ service, ``smabo_interfaces/srv/GetFile`` on ``/smabo/get_file``:
 
     uri = "robot_description"           → URDF (from robot_state_publisher)
     uri = "robot_description_semantic"  → SRDF (from move_group)
+    uri = "robot_description/nav" | "robot_description/plan"
+                                        → the URDF that mode would switch to (mode_manager.MODELS),
+                                          so a tab can show its robot before the mode is started
     uri = "package://<pkg>/<path>"      → mesh file under <pkg>'s share directory
 
 Both descriptions are latched (transient-local) topics, so the node subscribes
@@ -24,6 +27,8 @@ from std_msgs.msg import String
 from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from smabo_interfaces.srv import GetFile
 
+from .mode_manager import MODELS, build_urdf
+
 _MESH_EXTS = (".stl", ".dae", ".obj")
 _MAX_BYTES = 20 * 1024 * 1024
 
@@ -32,6 +37,7 @@ class RobotModelServer(Node):
     def __init__(self) -> None:
         super().__init__("robot_model_server")
         self._docs: dict[str, str] = {}
+        self._mode_urdfs: dict[str, str] = {}
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
         for topic in ("robot_description", "robot_description_semantic"):
@@ -48,6 +54,11 @@ class RobotModelServer(Node):
                 if doc is None:
                     raise FileNotFoundError(f"{uri} has not been published yet")
                 data = doc.encode("utf-8")
+            elif uri.startswith("robot_description/") and uri.split("/", 1)[1] in MODELS:
+                mode = uri.split("/", 1)[1]
+                if mode not in self._mode_urdfs:
+                    self._mode_urdfs[mode] = build_urdf(MODELS[mode])
+                data = self._mode_urdfs[mode].encode("utf-8")
             elif uri.startswith("package://"):
                 data = self._read_package_file(uri)
             else:

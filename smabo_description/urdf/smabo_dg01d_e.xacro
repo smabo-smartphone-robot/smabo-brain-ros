@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!--
+  smabo mobile chassis with DG01D-E gear motors (wheel encoders) under the
+  smabo base, and the LD19 lidar on top; the two always go together.
+  Meshes split from smabo-hardware/step/assembly/smabo_DG01D-E_ld19.step by
+  scripts/split_smabo_meshes.py.
+
+  Links (STEP parts):
+    chassis_link     : DG1D-E_bottom, DG01D-E_stopper1_L/R, DG01D-E_stopper2_LR, dc_motor_caster
+                       + both DG01D-E motors (simplified, from the bracket pockets)
+                       + ball caster (simplified, height set so the base stands level)
+    left/right_wheel_link : wheel (simplified, radius from smabo-esp32 config)
+    lidar_mount_link : ld19_base, ld19_stopper1/2 (on top of the base)
+    laser            : LD19 (simplified from its CAD); the frame is on the
+                       rotation axis at the scan plane, named `laser` to match
+                       the /scan header arriving over rosbridge
+  The motors, wheels, caster and LD19 are not in the STEP. From the brackets:
+  motor shaft 11.0 mm from the gearbox end, 19.0 mm below base_link; the wheel
+  sits just outside the bracket as on the TT chassis. Wheel separation 0.128 m
+  (centre to centre of the tyres), wheel radius 0.030 m; the ground is 0.049 m
+  below base_link. The LD19 stands centred on ld19_base (0.105 m above
+  base_link); its scan plane is taken as the middle of the rotating head,
+  0.0283 m above its bottom.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="smabo_dg01d_e_wheel" params="side y">
+    <xacro:smabo_mesh_link name="${side}_wheel_link" module="smabo_dg01d_e" material="smabo_dark" mass="0.03"/>
+    <joint name="${side}_wheel_joint" type="continuous">
+      <parent link="chassis_link"/>
+      <child  link="${side}_wheel_link"/>
+      <origin xyz="-0.021 ${y} -0.019" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="smabo_dg01d_e" params="parent:=base_link">
+    <joint name="chassis_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="chassis_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <xacro:smabo_mesh_link name="chassis_link" module="smabo_dg01d_e" material="smabo_mount" mass="0.17"/>
+
+    <xacro:smabo_dg01d_e_wheel side="left"  y="0.064"/>
+    <xacro:smabo_dg01d_e_wheel side="right" y="-0.064"/>
+
+    <joint name="lidar_mount_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="lidar_mount_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <xacro:smabo_mesh_link name="lidar_mount_link" module="smabo_dg01d_e" material="smabo_mount" mass="0.02"/>
+
+    <joint name="laser_joint" type="fixed">
+      <parent link="lidar_mount_link"/>
+      <child  link="laser"/>
+      <origin xyz="0 0 0.1333" rpy="0 0 0"/>
+    </joint>
+    <xacro:smabo_mesh_link name="laser" module="smabo_dg01d_e" material="smabo_dark" mass="0.05"/>
+  </xacro:macro>
+
+</robot>

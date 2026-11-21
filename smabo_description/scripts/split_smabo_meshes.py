@@ -5,6 +5,8 @@
   smabo_arm.step             -> meshes/smabo_arm/         arm_base_link, arm_link_1..4
   smabo_hand.step            -> meshes/smabo_hand/        hand_mount_link, left/right_hand_link
   smabo_tt_motor.step        -> meshes/smabo_tt_motor/    chassis_link, left/right_wheel_link
+  smabo_DG01D-E_ld19.step    -> meshes/smabo_dg01d_e/     chassis_link, left/right_wheel_link,
+                                                          lidar_mount_link, laser
   smabo_neck.step            -> meshes/smabo_neck/        pan_stand_link, pan_link
 Parts that belong to another module (the shared base, the breadboard mounts) are
 skipped in each assembly.
@@ -19,7 +21,7 @@ Each mesh is in metres and expressed in its link frame, matching urdf/*.xacro:
       arm  : sg90_4 / sg90_5 / hand lowered 1 mm
       hand : sg90_base + arm_hand moved 6.9 mm toward the centre of the plate
   * servos and motors that are not in the STEP are added as simplified shapes
-    (SG90, MG996R, TT gear motor, wheel, ball caster) to the link they are
+    (SG90, MG996R, TT / DG01D-E gear motor, wheel, ball caster, LD19) to the link they are
     screwed into; positions are fitted to the pockets of the brackets. The
     caster height is chosen so the base stands level on wheels and caster.
 Needs OCP (cadquery-ocp) and trimesh.
@@ -87,6 +89,32 @@ def tt_motor(top=1):
         box((22.3, 17.5, th), (11.0 - 42.1 - 22.3/2, top * (22.3 - 17.5)/2, 0)),   # motor end
         box((5.0, 5.0, 2.0), (11.0 + 2.5, 0, 0)),                 # mounting ear
         cyl(2.7, th/2, th/2 + 9.1),                               # output shaft
+    ])
+
+def dg01d_e(top=1):
+    """DG01D-E gear motor with encoder, simplified from its brackets in
+    smabo_DG01D-E_ld19.step: TT-size gearbox (22.3 tall x 18.7 thick, shaft 11.0
+    from the gearbox end) and a round motor can (r 10, from the bracket arcs)
+    that reaches the rear bracket 66 from the gearbox end. Same local frame as
+    tt_motor(): origin on the shaft axis at the body mid-plane, shaft along +z,
+    motor end toward -x."""
+    th = 18.7
+    can = trimesh.creation.cylinder(10.0, 66.0 - 42.1, sections=48)
+    can.apply_transform(R(np.pi / 2, [0, 1, 0]))
+    can.apply_translation((11.0 - 42.1 - (66.0 - 42.1) / 2, 0, 0))
+    return trimesh.util.concatenate([
+        box((42.1, 22.3, th), (11.0 - 42.1/2, 0, 0)),             # gearbox
+        can,                                                      # motor + encoder
+        cyl(2.7, th/2, th/2 + 9.1),                               # output shaft
+    ])
+
+def ld19():
+    """LDROBOT LD19 lidar, simplified from its CAD (LD19_v2.step): 38 x 38 body
+    22 tall, rotating head r 17.5 up to 34.6. Origin at the centre of the
+    bottom face, cable connector toward -y."""
+    return trimesh.util.concatenate([
+        box((38.0, 38.0, 22.0), (0, 0, 11.0)),
+        cyl(17.5, 22.0, 34.6),
     ])
 
 def caster(h):
@@ -163,7 +191,7 @@ ASSEMBLIES = {
         step="smabo_tt_motor.step",
         links={
             "chassis_link": ((50.0, 50.0, 0.0), ["tt_motor_bottom", "tt_motor_stopper1",
-                                                 "tt_motor_stopper2", "dc_motor_caster"]),
+                                                 "tt_motor_stopper2_LR", "dc_motor_caster"]),
             "left_wheel_link": ((71.5, -15.0, -19.85), []),
             "right_wheel_link": ((71.5, 115.0, -19.85), []),
         },
@@ -175,6 +203,37 @@ ASSEMBLIES = {
                              place(caster(-39.0 - (-19.85 - 30.0)), (9.0, 50.0, -39.0), (0, 0, 1))],
             "left_wheel_link": [place(wheel(), (71.5, -15.0, -19.85), (0, 1, 0))],
             "right_wheel_link": [place(wheel(), (71.5, 115.0, -19.85), (0, 1, 0))],
+        },
+    ),
+    # DG01D-E motors (encoders) + LD19 lidar, always together. Motor position
+    # from the brackets: gearbox end on DG01D-E_stopper2 (x 82), body mid-plane
+    # y 11 / 89, shaft axis z -19 (centre of the stopper1 arcs and the stopper2
+    # locating slot), shaft 11.0 from the gearbox end -> x 71. The wheel sits
+    # outside the bracket as on the TT chassis (15.65 from the body face).
+    # The LD19 stands on ld19_base (top z 105), centred, held at its ears by
+    # ld19_stopper1 and at the connector by ld19_stopper2; its scan plane is
+    # taken as the middle of the rotating head (28.3 above its bottom).
+    "smabo_dg01d_e": dict(
+        step="smabo_DG01D-E_ld19.step",
+        links={
+            "chassis_link": ((50.0, 50.0, 0.0), ["DG1D-E_bottom", "DG01D-E_stopper1_L",
+                                                 "DG01D-E_stopper1_R", "DG01D-E_stopper2_LR",
+                                                 "dc_motor_caster"]),
+            "left_wheel_link": ((71.0, -14.0, -19.0), []),
+            "right_wheel_link": ((71.0, 114.0, -19.0), []),
+            "lidar_mount_link": ((50.0, 50.0, 0.0), ["ld19_base", "ld19_stopper1", "ld19_stopper2"]),
+            "laser": ((50.0, 50.0, 105.0 + 28.3), []),
+        },
+        skip=BASE_PARTS + BREADBOARD_PARTS,
+        extras={
+            "chassis_link": [place(dg01d_e(), (71.0, 11.0, -19.0), (0, -1, 0), (-1, 0, 0)),
+                             place(dg01d_e(), (71.0, 89.0, -19.0), (0, 1, 0), (-1, 0, 0)),
+                             # under dc_motor_caster (bottom z -39) down to the wheel bottom (-19 - 30)
+                             place(caster(-39.0 - (-19.0 - 30.0)), (9.0, 50.0, -39.0), (0, 0, 1))],
+            "left_wheel_link": [place(wheel(), (71.0, -14.0, -19.0), (0, 1, 0))],
+            "right_wheel_link": [place(wheel(), (71.0, 114.0, -19.0), (0, 1, 0))],
+            # connector toward STEP -y (the stopper2 side); ROS: toward +y (left)
+            "laser": [ld19().apply_transform(T((50.0, 50.0, 105.0)))],
         },
     ),
     "smabo_neck": dict(

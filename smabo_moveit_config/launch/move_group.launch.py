@@ -6,7 +6,7 @@ smabo_brain_ros/servo_trajectory_bridge (see config/moveit_controllers.yaml).
 
 The robot configuration is picked with the same args as smabo.urdf.xacro and
 passed to both the URDF and the SRDF xacro: ``arm`` / ``hand`` / ``breadboard``
-(true|false) and ``mount`` (none|tt_motor|neck).
+(true|false) and ``mount`` (none|tt_motor|dg01d_e|neck).
 
 Set ``use_rsp:=true`` to also start robot_state_publisher (standalone use); the
 top-level bringup launch starts it once for the whole system instead.

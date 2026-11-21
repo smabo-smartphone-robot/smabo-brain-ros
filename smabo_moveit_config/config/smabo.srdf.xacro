@@ -69,7 +69,7 @@
     <xacro:if value="${breadboard}">
       <disable_collisions link1="hand_mount_link" link2="breadboard_link" reason="Adjacent"/>
     </xacro:if>
-    <xacro:if value="${mount == 'tt_motor'}">
+    <xacro:if value="${mount in ('tt_motor', 'dg01d_e')}">
       <disable_collisions link1="hand_mount_link" link2="chassis_link"   reason="Adjacent"/>
     </xacro:if>
     <xacro:if value="${mount == 'neck'}">
@@ -82,7 +82,7 @@
     <xacro:if value="${arm}">
       <disable_collisions link1="breadboard_link" link2="arm_base_link" reason="Adjacent"/>
     </xacro:if>
-    <xacro:if value="${mount == 'tt_motor'}">
+    <xacro:if value="${mount in ('tt_motor', 'dg01d_e')}">
       <disable_collisions link1="breadboard_link" link2="chassis_link"  reason="Adjacent"/>
     </xacro:if>
     <xacro:if value="${mount == 'neck'}">
@@ -90,12 +90,23 @@
     </xacro:if>
   </xacro:if>
 
-  <xacro:if value="${mount == 'tt_motor'}">
+  <xacro:if value="${mount in ('tt_motor', 'dg01d_e')}">
     <disable_collisions link1="base_link" link2="chassis_link"           reason="Adjacent"/>
     <disable_collisions link1="chassis_link" link2="left_wheel_link"     reason="Adjacent"/>
     <disable_collisions link1="chassis_link" link2="right_wheel_link"    reason="Adjacent"/>
     <disable_collisions link1="base_link" link2="left_wheel_link"        reason="Never"/>
     <disable_collisions link1="base_link" link2="right_wheel_link"       reason="Never"/>
+  </xacro:if>
+
+  <xacro:if value="${mount == 'dg01d_e'}">
+    <disable_collisions link1="base_link" link2="lidar_mount_link"      reason="Adjacent"/>
+    <disable_collisions link1="lidar_mount_link" link2="laser"          reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="laser"                 reason="Never"/>
+    <disable_collisions link1="chassis_link" link2="lidar_mount_link"   reason="Never"/>
+    <disable_collisions link1="chassis_link" link2="laser"              reason="Never"/>
+    <xacro:if value="${breadboard}">
+      <disable_collisions link1="breadboard_link" link2="lidar_mount_link" reason="Adjacent"/>
+    </xacro:if>
   </xacro:if>
 
   <xacro:if value="${mount == 'neck'}">

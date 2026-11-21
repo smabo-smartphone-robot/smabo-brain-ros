@@ -4,7 +4,10 @@ Nav2's navigation servers (planner, controller, behaviours, bt_navigator) run
 all the time (bringup). What changes is who provides the ``map`` frame and the
 ``/map`` topic, and this node starts / stops that part as a child process:
 
-  mapping     slam_toolbox (online async): /scan + /odom -> /map, map -> odom
+  mapping     SLAM: /scan + /odom -> /map, map -> odom. Cartographer by default
+              (smabo_navigation cartographer.launch.py); slam_backend:=slam_toolbox
+              runs slam_toolbox (online async) instead, which does not correct
+              turning in place (it waits until the robot has moved)
   navigation  map_server + AMCL (nav2_bringup localization_launch.py) on a
               saved map: /map from the file, map -> odom from AMCL
   off         neither (e.g. to drive by hand with only /odom)
@@ -32,7 +35,6 @@ from __future__ import annotations
 import json
 import os
 import queue
-import signal
 import subprocess
 import threading
 import time
@@ -46,9 +48,19 @@ from rclpy.time import Time
 from std_msgs.msg import String
 from tf2_ros import Buffer, TransformListener
 
+from .child_process import start_group, stop_group
 from .nav_maps import check_name, list_maps, maps_dir, yaml_path
 
-MODES = ("off", "mapping", "navigation")
+
+def slam_command(backend: str, slam_params: str = "") -> list[str]:
+    """The child process that runs SLAM for ``mapping`` mode."""
+    if backend == "cartographer":
+        return ["ros2", "launch", "smabo_navigation", "cartographer.launch.py"]
+    args = ["ros2", "run", "slam_toolbox", "async_slam_toolbox_node", "--ros-args",
+            "-r", "__node:=slam_toolbox"]
+    if slam_params:
+        args += ["--params-file", slam_params]
+    return args
 
 
 class NavManager(Node):
@@ -58,13 +70,17 @@ class NavManager(Node):
         self.declare_parameter("initial_mode", "navigation")   # off | mapping | navigation
         self.declare_parameter("initial_map", "")               # yaml path or saved map name
         self.declare_parameter("nav2_params", "")
-        self.declare_parameter("slam_params", "")
+        self.declare_parameter("slam_backend", "cartographer")  # cartographer | slam_toolbox
+        self.declare_parameter("slam_params", "")               # slam_toolbox only
         val = lambda n: self.get_parameter(n).value  # noqa: E731
 
         self.maps_dir = maps_dir(val("maps_dir") or None)
         os.makedirs(self.maps_dir, exist_ok=True)
         self.nav2_params = val("nav2_params")
+        self.slam_backend = val("slam_backend")
         self.slam_params = val("slam_params")
+        if self.slam_backend not in ("cartographer", "slam_toolbox"):
+            raise ValueError(f"slam_backend must be cartographer or slam_toolbox, not {self.slam_backend!r}")
 
         self.mode = "off"
         self.map = ""            # name (saved map) or yaml path of the map in use
@@ -93,9 +109,9 @@ class NavManager(Node):
     # ------------------------------------------------------------------ #
     def _publish_state(self) -> None:
         if self._proc is not None and self._proc.poll() is not None and not self.busy:
-            self._set(message=f"{self.mode} stopped unexpectedly (exit {self._proc.returncode})",
-                      mode="off", map="")
-            self._proc = None
+            # clear _proc first: _set() publishes the state again through here
+            code, self._proc = self._proc.returncode, None
+            self._set(message=f"{self.mode} stopped unexpectedly (exit {code})", mode="off", map="")
             return
         state = {"mode": self.mode, "map": self.map, "maps": list_maps(self.maps_dir),
                  "busy": self.busy, "message": self.message, "maps_dir": self.maps_dir}
@@ -145,11 +161,7 @@ class NavManager(Node):
 
     def _do_mapping(self, _cmd: dict) -> None:
         self._stop_child()
-        args = ["ros2", "run", "slam_toolbox", "async_slam_toolbox_node", "--ros-args",
-                "-r", "__node:=slam_toolbox"]
-        if self.slam_params:
-            args += ["--params-file", self.slam_params]
-        self._start_child(args)
+        self._start_child(slam_command(self.slam_backend, self.slam_params))
         self._set(mode="mapping", map="", message="SLAM started: drive around to build the map")
 
     def _do_save(self, cmd: dict) -> None:
@@ -200,23 +212,11 @@ class NavManager(Node):
     # ------------------------------------------------------------------ #
     def _start_child(self, args: list[str]) -> None:
         self.get_logger().info("starting: " + " ".join(args))
-        self._proc = subprocess.Popen(args, start_new_session=True)
+        self._proc = start_group(args)
 
     def _stop_child(self) -> None:
         p, self._proc = self._proc, None
-        if p is None or p.poll() is not None:
-            return
-        for sig, wait in ((signal.SIGINT, 10.0), (signal.SIGTERM, 5.0), (signal.SIGKILL, 5.0)):
-            try:
-                os.killpg(p.pid, sig)
-            except ProcessLookupError:
-                return
-            try:
-                p.wait(timeout=wait)
-                break
-            except subprocess.TimeoutExpired:
-                continue
-        time.sleep(1.0)        # let the old map -> odom publisher go before the next one starts
+        stop_group(p, sigint_wait=10.0)
 
     # ------------------------------------------------------------------ #
     # SLAM -> AMCL pose handover

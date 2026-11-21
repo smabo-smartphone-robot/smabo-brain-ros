@@ -6,7 +6,7 @@ for the servo joints normally come from /joint_states (ESP32 via rosbridge); set
 
 The configuration is picked with the xacro args of smabo.urdf.xacro, passed
 through as launch args: ``arm`` / ``hand`` / ``breadboard`` (true|false) and
-``mount`` (none|tt_motor|neck).
+``mount`` (none|tt_motor|dg01d_e|neck).
 """
 
 from launch import LaunchDescription
