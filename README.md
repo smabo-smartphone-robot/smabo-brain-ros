@@ -1,5 +1,10 @@
 # smabo-brain-ros
 
+> **smabo（スマボ）** は、手のひらサイズのスマホロボット（スマートフォンロボット）です。手持ちのスマホが顔とセンサーになり、工具なしでブロックのように組み立てられます。
+> このリポジトリは smabo の ROS 2 版（Nav2・MoveIt 2）です。使い方は [製作ガイド](https://smabo-smartphone-robot.github.io/guides/brainros/)、ほかのリポジトリは [smabo-smartphone-robot](https://github.com/smabo-smartphone-robot) を見てください。
+>
+> *smabo is a palm-sized smartphone robot: your phone becomes its face and sensors, and it snaps together without tools. This repository is the ROS 2 runtime (Nav2, MoveIt 2). Guides: [smabo-smartphone-robot.github.io](https://smabo-smartphone-robot.github.io/)*
+
 smabo-brain の **ROS 2 ラッパー**であり、smabo の **ROS 2 ランタイム一式**。
 smabo-brain の純ロジック（`brain.odometry`・`brain.topics` など）を **import して再利用**しつつ、
 ROS 2 のエコシステム（**rosbridge_suite / Nav2 / MoveIt2**）でナビゲーションと動作計画を提供します。
